@@ -10,6 +10,7 @@ Ensure you have the following installed on your system:
 Build and run docker container
 
 ```bash
+docker pull matteobusi/alvie
 docker build -t alvie .
 docker run -it alvie
 ```
