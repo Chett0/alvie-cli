@@ -1,0 +1,38 @@
+{
+    "Learn" : {
+        "name" : "Learn",
+        "description" : "Learn a Mealy machine model",
+        "file" : "learn.exe",
+        "args" : [
+            {
+                "description": "Path to attacker specification (.atdl file)",
+                "flag": "--att-spec",
+                "required": true
+            },
+            {
+                "description": "Path to enclave specification (.etdl file)",
+                "flag": "--enc-spec",
+                "required": true
+            },
+            {
+                "description": "Query oracle mode",
+                "flag": "--oracle",
+                "required": true,
+                "values" : ["randomwalk", "pac", "exhaustive"]
+            },
+            {
+                "description": "Output .dot file path for the learned model",
+                "flag": "--res",
+                "required": false
+            }
+        ]
+    },
+    "Fa" : {
+        "name" : "Fa",
+        "description" : "Find flow-analysis (NI) violations between two models",
+        "file" : "fa.exe"
+    },
+    "exit" : {
+        "name" : "Exit"
+    }
+}

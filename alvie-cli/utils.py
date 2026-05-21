@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import subprocess
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -16,13 +17,18 @@ def get_alvie_code_path() -> Path:
     return Path(alvie_code_path).expanduser().resolve()
 
 
-def run_executable(
-        alvie_code_path: Path, 
+def run_alvie(
+        alvie_path: Path, 
         executable_name : str,
-        args: list[str]):
+        args: list[str]
+    ) -> None:
 
-    subprocess.run("dune build",
-                    cwd=alvie_code_path,
+    subprocess.run(["dune", "build"],
+                    cwd=alvie_path,
                     check=True
                     )
-    subprocess.run([f"{alvie_code_path}/_build/default/bin/{executable_name}.exe", *args])
+    subprocess.run([f"{alvie_path}/_build/default/bin/{executable_name}.exe", *args])
+
+def get_commands():
+    with open("./commands/commands.json", "r") as file:
+        return json.load(file)

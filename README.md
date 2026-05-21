@@ -27,5 +27,5 @@ pip install -r requirements.txt
 Run 
 
 ```bash
-python src/main.py
+python alvie-cli
 ```
