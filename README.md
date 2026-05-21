@@ -3,10 +3,16 @@
 ## Requirements
 
 Ensure you have the following installed on your system:
-- Python
-- pip
+- Docker
 
-### Environment Variables
+## Execution
+
+Build and run docker container
+
+```bash
+docker build -t alvie .
+docker run -it alvie
+```
 
 Create a file named .env in the root directory 
 
@@ -14,14 +20,10 @@ Create a file named .env in the root directory
 ALVIE_CODE_PATH=path/to/alvie/codebase
 ```
 
-## Execution
-
-Create a virtual environment and install dependencies:
+Activate python virtual environment
 
 ```bash
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
+source venv/bin/activate
 ```
 
 Run 
