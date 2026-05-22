@@ -38,7 +38,7 @@ def run_alvie(
     subprocess.run([exe, *args], cwd=alvie_path, check=True)
 
 def get_commands():
-    
-    # with open("./commands/commands.json", "r") as file:
-    with open("/home/alvie/alvie-cli/commands/commands.json", "r") as file:
+
+    commands_path = Path(__file__).resolve().parent.parent / "commands" / "commands.json"
+    with commands_path.open("r") as file:
         return json.load(file)

@@ -34,3 +34,15 @@ class DirectoryValidator(Validator):
                 message="Input is not a valid directory path",
                 cursor_position=document.cursor_position
             )
+        
+class IntValidator(Validator):
+
+    def __init__(self):
+        pass
+
+    def validate(self, document : Document) -> None:
+        if not document.text.isdigit():
+            raise ValidationError(
+                message="Input must be an integer",
+                cursor_position=document.cursor_position
+            )

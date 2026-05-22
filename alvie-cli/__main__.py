@@ -2,12 +2,17 @@ from pathlib import Path
 
 from InquirerPy.prompts.list import ListPrompt
 from InquirerPy.base.control import Choice
-from InquirerPy.prompts.input import InputPrompt
-from InquirerPy.prompts.filepath import FilePathPrompt
 
 from utils import get_alvie_code_path, get_commands, run_alvie
-from validators import FileExtensionValidator, DirectoryValidator
+from input_selectors import select_file, select_directory, select_choice, select_boolean, select_int
 
+types_selector = {
+    "filename" : select_file,
+    "directory" : select_directory,
+    "choice" : select_choice,
+    "boolean" : select_boolean,
+    "int" : select_int
+}
 
 def choose_command(alvie_path: Path):
 
@@ -33,73 +38,54 @@ def choose_command(alvie_path: Path):
         
     run_alvie(alvie_path, "learn", args)
 
+def get_arg_value(arg: dict) -> str:
+    type = arg.get("type", None)
+    if not type: raise ValueError(f"Argument {arg['flag']} does not have a type specified.")
+    
+    selector = types_selector.get(type, None)
+    if not selector: raise ValueError(f"Argument {arg['flag']} has unknown type {type}.")
+
+    value = selector(arg)
+    if not value: raise ValueError(f"Argument {arg['flag']} is required but no value was provided.")
+
+    return value
 
 def choose_args(command: dict) -> tuple[bool, list[str]]:
 
     args = []
     config_args = command["args"]
-    required_args = [arg for arg in config_args if arg["required"]]
-    optional_args = [arg for arg in config_args if not arg["required"]]
+
+    required_args = []
+    optional_args = []
+
+    for arg in config_args:
+        if arg.get("required"):
+            required_args.append(arg)
+        else:
+            optional_args.append(arg)
+            
 
     for arg in required_args:
-        
-        type = arg.get("type", None)
-        if not type: raise ValueError(f"Argument {arg['flag']} does not have a type specified.")
-        
-        value = None
-
-        if type == "filename":
-
-            expected_extension = arg.get("extension")
-            if expected_extension and not expected_extension.startswith("."):
-                expected_extension = f".{expected_extension}"
-
-            must_exists = True
-            validation = arg.get("validation")
-            if validation:
-                must_exists = validation.get("must_exists", True) 
-                        
-            value = FilePathPrompt(
-                message=f"{arg['description']} {'(required)' if arg['required'] else '(optional)'}:",
-                default = arg['default'],
-                validate=FileExtensionValidator(
-                    expected_extension=expected_extension,
-                    must_exists=must_exists
-                )
-            ).execute()
-
-        elif type == "directory":
-
-            must_exists = True
-            validation = arg.get("validation")
-            if validation:
-                must_exists = validation.get("must_exists", True) 
-
-            value = FilePathPrompt(
-                message=f"{arg['description']} {'(required)' if arg['required'] else '(optional)'}:",
-                default = arg['default'],
-                validate=DirectoryValidator(
-                    must_exists=must_exists
-                )
-            ).execute()
-            
-        elif type == "choice":
-            
-            value = ListPrompt(
-                message=f"{arg['description']} {'(required)' if arg['required'] else '(optional)'}:",
-                choices=arg["values"]
-            ).execute()
-            
-        if not value: raise ValueError(f"Argument {arg['flag']} is required but no value was provided.")
-        
+        value = get_arg_value(arg)
         args.extend([f"{arg['flag']}", value])
 
-    choice = ListPrompt(
-        message="Do you want to provide optional arguments?",
-        choices=[arg["description"] for arg in optional_args] + ["Done", "Back"],
-    ).execute()
-    
-    # TODO: manage optional arguments
+
+    while optional_args:
+
+        optional_choices = [Choice(value=arg, name=arg["description"]) for arg in optional_args]
+        arg = ListPrompt(
+            message="Do you want to provide optional arguments?",
+            choices=optional_choices + [Choice(value="Done", name="done"), Choice(value="Back", name="back")]
+        ).execute()
+
+        if arg == "Done":
+            break
+        if arg == "Back":
+            return False, []
+        else:
+            value = get_arg_value(arg)
+            args.extend([f"{arg['flag']}", value])
+            optional_args.remove(arg)
     
     # /home/alvie/spec-lib/example/enclave.etdl requires explicit secret in '?'
     args.extend(["--secret", "0"])

@@ -63,6 +63,25 @@
                 },
                 "default": "/home/alvie/sancus-core-gap",
                 "required": true
+            },
+            {
+                "description": "Max steps per random walk / PAC sample",
+                "flag": "--step-limit",
+                "type": "int",
+                "default": "200",
+                "required": false
+            },
+            {
+                "description": "Enable debug-level logging",
+                "flag": "--debug",
+                "type": "boolean",
+                "required": false
+            },
+            {
+                "description": "Enable info-level logging",
+                "flag": "--info",
+                "type": "boolean",
+                "required": false
             }
         ]
     },
