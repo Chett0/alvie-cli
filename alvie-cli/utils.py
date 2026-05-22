@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def get_alvie_code_path() -> Path:
-    alvie_code_path = os.getenv("ALVIE_CODE_PATH")
+    # alvie_code_path = os.getenv("ALVIE_CODE_PATH")
+    alvie_code_path = os.environ["ALVIE_CODE_PATH"]
 
     if not alvie_code_path:
         raise EnvironmentError(
@@ -23,12 +24,21 @@ def run_alvie(
         args: list[str]
     ) -> None:
 
-    subprocess.run(["dune", "build"],
-                    cwd=alvie_path,
-                    check=True
-                    )
-    subprocess.run([f"{alvie_path}/_build/default/bin/{executable_name}.exe", *args])
+    # execute if file .ml is modified
+    # subprocess.run(["dune", "build"],
+    #                 cwd=alvie_path,
+    #                 check=True
+    #                 )
+    
+    exe = f"{alvie_path}/_build/default/bin/{executable_name}.exe"
+    print(f"Running {exe} with arguments")
+    for i in range(len(args)//2):
+        print(f"{args[2*i]}: {args[2*i+1]}")
+    print()
+    subprocess.run([exe, *args], cwd=alvie_path, check=True)
 
 def get_commands():
-    with open("./commands/commands.json", "r") as file:
+    
+    # with open("./commands/commands.json", "r") as file:
+    with open("/home/alvie/alvie-cli/commands/commands.json", "r") as file:
         return json.load(file)

@@ -7,23 +7,44 @@
             {
                 "description": "Path to attacker specification (.atdl file)",
                 "flag": "--att-spec",
+                "type": "filename",
+                "default": "/home/alvie/spec-lib/example/attacker.atdl",
                 "required": true
             },
             {
                 "description": "Path to enclave specification (.etdl file)",
-                "flag": "--enc-spec",
+                "flag": "--encl-spec",
+                "type": "filename",
+                "default": "/home/alvie/spec-lib/example/enclave.etdl",
                 "required": true
             },
             {
-                "description": "Query oracle mode",
+                "description": "Oracle that must be used for equivalence check",
                 "flag": "--oracle",
-                "required": true,
-                "values" : ["randomwalk", "pac", "exhaustive"]
+                "type": "choice",
+                "values" : ["randomwalk", "pac", "exhaustive"],
+                "required": true
             },
             {
-                "description": "Output .dot file path for the learned model",
+                "description": "Temporary directory where intermediate results will be stored",
+                "flag": "--tmpdir",
+                "type": "directory",
+                "default": "/tmp/alvie",
+                "required": true
+            },
+            {
+                "description": "File where the final learned model will be stored (.dot file)",
                 "flag": "--res",
-                "required": false
+                "type": "filename",
+                "default": "/tmp/alvie/result.dot",
+                "required": true
+            },
+            {
+                "description": "Directory where the sancus-core-gap repository was cloned",
+                "flag": "--sancus",
+                "type": "directory",
+                "default": "/home/alvie/sancus-core-gap",
+                "required": true
             }
         ]
     },

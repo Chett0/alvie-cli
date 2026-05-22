@@ -14,13 +14,17 @@ RUN mkdir -p /var/lib/apt/lists/partial && \
 RUN python -m venv venv
 
 ENV PATH="./venv/bin:$PATH"
+ENV ALVIE_CODE_PATH="/home/alvie/alvie/code"
 
-RUN pip install --upgrade pip
+RUN pip install --upgrade pip && \
+    pip install uv
 
 COPY requirements.txt .
 
-RUN pip install -r requirements.txt
+RUN uv pip install -r requirements.txt
 
 COPY . .
+
+USER alvie
 
 CMD ["/bin/bash"]

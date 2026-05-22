@@ -11,15 +11,15 @@ Build and run docker container
 
 ```bash
 docker pull matteobusi/alvie
-docker build -t alvie .
-docker run -it alvie
+docker build -t alvie-cli .
+docker run -it alvie-cli
 ```
 
-Create a file named .env in the root directory 
+<!-- Create a file named .env in the root directory 
 
 ```env
 ALVIE_CODE_PATH=path/to/alvie/codebase
-```
+``` -->
 
 Activate python virtual environment
 
