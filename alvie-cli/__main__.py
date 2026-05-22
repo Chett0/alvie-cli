@@ -3,10 +3,10 @@ from pathlib import Path
 from InquirerPy.prompts.list import ListPrompt
 from InquirerPy.base.control import Choice
 from InquirerPy.prompts.input import InputPrompt
-from InquirerPy.validator import PathValidator
-from InquirerPy.inquirer import filepath
+from InquirerPy.prompts.filepath import FilePathPrompt
 
 from utils import get_alvie_code_path, get_commands, run_alvie
+from validators import FileExtensionValidator, DirectoryValidator
 
 
 def choose_command(alvie_path: Path):
@@ -46,17 +46,41 @@ def choose_args(command: dict) -> tuple[bool, list[str]]:
         type = arg.get("type", None)
         if not type: raise ValueError(f"Argument {arg['flag']} does not have a type specified.")
         
-        if type in ["filename", "directory"]:
+        value = None
+
+        if type == "filename":
+
+            expected_extension = arg.get("extension")
+            if expected_extension and not expected_extension.startswith("."):
+                expected_extension = f".{expected_extension}"
+
+            must_exists = True
+            validation = arg.get("validation")
+            if validation:
+                must_exists = validation.get("must_exists", True) 
                         
-            value = filepath(
+            value = FilePathPrompt(
                 message=f"{arg['description']} {'(required)' if arg['required'] else '(optional)'}:",
                 default = arg['default'],
-                # TODO: add check on specific file extension
-                # TODO: add custom validator for new dirs / files
-                # validate=PathValidator(
-                    # is_file=(type == "filename"), 
-                    # is_dir=(type == "directory"),
-                    # message="Input is not a valid file path"),
+                validate=FileExtensionValidator(
+                    expected_extension=expected_extension,
+                    must_exists=must_exists
+                )
+            ).execute()
+
+        elif type == "directory":
+
+            must_exists = True
+            validation = arg.get("validation")
+            if validation:
+                must_exists = validation.get("must_exists", True) 
+
+            value = FilePathPrompt(
+                message=f"{arg['description']} {'(required)' if arg['required'] else '(optional)'}:",
+                default = arg['default'],
+                validate=DirectoryValidator(
+                    must_exists=must_exists
+                )
             ).execute()
             
         elif type == "choice":
