@@ -1,0 +1,13 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    
+    volumes:
+      - .:/home/alvie/alvie-cli
+
+    working_dir: /home/alvie/alvie-cli
+
+    stdin_open: true
+    tty: true

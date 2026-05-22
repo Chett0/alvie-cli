@@ -220,3 +220,7 @@ __marimo__/
 .streamlit/secrets.toml
 
 .bash_history
+.copilot/
+.gnupg/
+.vscode-server/
+.gitconfig
