@@ -5,7 +5,7 @@ from InquirerPy.base.control import Choice
 
 from pathlib import Path
 
-from utils import get_instructions
+from utils import BACK_CHOICE, DONE_CHOICE, get_instructions, is_back, is_done
 from validators import FileExtensionValidator, ParameterValidator
 from instructions import Combinator, Atom, Param
 
@@ -22,37 +22,69 @@ def build_atoms(
 
     expr : str = ""
 
-    choices = [
+    choices : list[Choice] = [
         Choice(value=atom, name=atom.name) for atom in atoms
     ] + [
-        Choice(value="Back", name="back")
+        BACK_CHOICE
     ]
+
+    # TODO defining atoms'description, parameters and examples
 
     atom : Atom = ListPrompt(
         message="Choose atom:",
         choices=choices
     ).execute()
 
-    if atom == "Back":
+    if is_back(atom):
         return ""
 
     expr = atom.name
-    atom_params : list[Param] = atom.params
-    num_params = atom.get_num_params()
 
-    # TODO handle list parameters (see ifz, balanced_fiz)
+    if atom.name == "ifz":
+
+        sub_expr : str | None = None
+        add_choice : Choice = Choice(value="add atom", name="add atom")
+        choices = [
+            add_choice,
+            DONE_CHOICE
+        ]
+
+        while True:
+
+            action : str = ListPrompt(
+                message="Build ifz condition:",
+                choices=choices
+            ).execute()
+
+            if is_done(action):
+                if not sub_expr:
+                    sub_expr = "eps"
+                break
+
+            if action == add_choice.value:
+                new_sub_expr = build_atoms(atoms)
+                if sub_expr:
+                    sub_expr += f"; {new_sub_expr}"
+                else:
+                    sub_expr = new_sub_expr
+
+        expr += f" ({sub_expr})"
+
+
+    num_params : int = atom.get_num_params()
+
+    # TODO handle balanced_ifz parameter
 
     if num_params > 0:
 
-        atom_example = atom.example
-        if atom_example:
-            print(f"Example: {atom_example}\n")
+        if atom.example:
+            print(f"Example: {atom.example}\n")
 
         params = []
 
         for i in range(num_params):
 
-            param_validator = ParameterValidator(operand_types=atom_params[i].operands)
+            param_validator = ParameterValidator(operand_types=atom.params[i].operands)
 
             param = InputPrompt(
                 message=f"Parameter {i+1}:",
@@ -73,26 +105,26 @@ def build_instruction_list(
         title: str = "Build enclave body"
     ) -> str:
 
-    expr = ""
+    expr : str = ""
 
-    choices = [
+    choices : list[Choice] = [
             Choice(value=combinator.name, name=combinator.name) for combinator in combinators
         ] + [
             Choice(value="Show", name="show"),
-            Choice(value="Back", name="back"),
-            Choice(value="Done", name="done")
+            BACK_CHOICE,
+            DONE_CHOICE
         ]
 
     while True:
-        action = ListPrompt(
+        action : str = ListPrompt(
             message=title,
             choices= choices 
         ).execute()
 
-        if action == "Done":
+        if is_done(action):
             break
 
-        if action == "Back":
+        if is_back(action):
             return ""
         
         if action == "eps":
@@ -102,11 +134,11 @@ def build_instruction_list(
                 expr = "eps"
             
         elif action == "Show":
-            enclave_text = render_enclave(expr)
+            enclave_text : str = render_enclave(expr)
             print_enclave(enclave_text)
 
         elif action == "sequence ;":
-            sub_expr = build_atoms(atoms)
+            sub_expr : str = build_atoms(atoms)
             if expr:
                 expr += f"; {sub_expr}"
             else:
@@ -114,14 +146,14 @@ def build_instruction_list(
 
         elif action == "choice |":
             if not expr:
-                left_sub_expr = build_instruction_list(
+                left_sub_expr : str = build_instruction_list(
                     combinators, 
                     atoms, 
                     "Build left side of choice"
                 )
                 expr = left_sub_expr
 
-            right_sub_expr = build_instruction_list(
+            right_sub_expr : str = build_instruction_list(
                 combinators, 
                 atoms, 
                 "Build right side of choice"
@@ -131,11 +163,11 @@ def build_instruction_list(
                 expr = f"{expr} | {right_sub_expr}"
 
         elif action == "repeat *":
-            sub_expr = expr if expr else build_atoms(atoms)
+            sub_expr : str = expr if expr else build_atoms(atoms)
             expr = f"({sub_expr})*"
 
         elif action == "group (...)":
-            sub_expr = build_instruction_list(
+            sub_expr : str = build_instruction_list(
                 combinators, 
                 atoms, 
                 "Build group expression"
@@ -162,24 +194,24 @@ def build_enclave() -> None:
 
     print("Victim enclave builder\n")
 
-    instructions = get_instructions()
+    instructions : dict = get_instructions()
     if not instructions:
         print("No instructions found. Please check the configuration.")
         return
     
-    enclave_instructions = instructions.get("enclave", [])
+    enclave_instructions : dict = instructions.get("enclave", [])
     if not enclave_instructions:
         print("No enclave instructions found. Please check the configuration.")
         return
     
-    atoms = enclave_instructions.get("atoms", [])
+    atoms : list = enclave_instructions.get("atoms", [])
     if not atoms:
         print("No enclave atoms found. Please check the configuration.")
         return
     
     atoms = [Atom.model_validate(atom) for atom in atoms]
     
-    combinators = enclave_instructions.get("combinators", [])
+    combinators : list = enclave_instructions.get("combinators", [])
     if not combinators:
         print("No enclave combinators found. Please check the configuration.")
         return
@@ -187,15 +219,15 @@ def build_enclave() -> None:
     combinators = [Combinator.model_validate(combinator) for combinator in combinators]
 
     
-    body = build_instruction_list(
+    body : str = build_instruction_list(
         combinators=combinators,
         atoms=atoms
     )
     if not body:
         return
-    enclave_text = render_enclave(body)
+    enclave_text : str = render_enclave(body)
 
-    output_path = FilePathPrompt(
+    output_path : str = FilePathPrompt(
         message="Output file:",
         default="enclaves/victim.etdl",
         validate=FileExtensionValidator(

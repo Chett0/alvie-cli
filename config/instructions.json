@@ -36,6 +36,10 @@
                     }
                 ],
                 "example": "r1, 5"
+            },
+            {
+                "name": "ifz",
+                "description": ""
             }
         ],
         "combinators" : [

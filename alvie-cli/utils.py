@@ -4,7 +4,18 @@ import subprocess
 import json
 from dotenv import load_dotenv
 
+from InquirerPy.base.control import Choice
+
 load_dotenv()
+
+DONE_CHOICE : Choice = Choice(value="Done", name="done")
+BACK_CHOICE : Choice = Choice(value="Back", name="back")
+
+def is_done(value) -> bool:
+    return value == DONE_CHOICE.value
+
+def is_back(value) -> bool:
+    return value == BACK_CHOICE.value
 
 def get_alvie_code_path() -> Path:
     # alvie_code_path = os.getenv("ALVIE_CODE_PATH")

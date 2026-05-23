@@ -3,7 +3,7 @@ from pathlib import Path
 from InquirerPy.prompts.list import ListPrompt
 from InquirerPy.base.control import Choice
 
-from utils import get_alvie_code_path, get_commands, run_alvie
+from utils import BACK_CHOICE, DONE_CHOICE, get_alvie_code_path, get_commands, is_back, is_done, run_alvie
 from input_selectors import select_file, select_directory, select_choice, select_boolean, select_int
 
 types_selector = {
@@ -74,15 +74,15 @@ def choose_args(command: dict) -> tuple[bool, list[str]]:
 
     while optional_args:
 
-        optional_choices = [Choice(value=arg, name=arg["description"]) for arg in optional_args]
+        optional_choices : list[Choice] = [Choice(value=arg, name=arg["description"]) for arg in optional_args]
         arg = ListPrompt(
             message="Do you want to provide optional arguments?",
-            choices=optional_choices + [Choice(value="Done", name="done"), Choice(value="Back", name="back")]
+            choices=optional_choices + [DONE_CHOICE, BACK_CHOICE]
         ).execute()
 
-        if arg == "Done":
+        if is_done(arg):
             break
-        if arg == "Back":
+        if is_back(arg):
             return False, []
         else:
             value = get_arg_value(arg)
