@@ -4,8 +4,10 @@ from InquirerPy.prompts.list import ListPrompt
 from InquirerPy.base.control import Choice
 
 from pathlib import Path
+
 from utils import get_instructions
-from validators import FileExtensionValidator
+from validators import FileExtensionValidator, ParameterValidator
+from instructions import Combinator, Atom, Param
 
 def print_enclave(enclave: str, output_path: Path | None = None) -> None:
     print("\nGenerated enclave:\n")
@@ -15,18 +17,18 @@ def print_enclave(enclave: str, output_path: Path | None = None) -> None:
 
 
 def build_atoms(
-        atoms : dict
+        atoms : list[Atom]
     ) -> str:
 
-    expr = ""
+    expr : str = ""
 
     choices = [
-        Choice(value=atom, name=atom["name"]) for atom in atoms
+        Choice(value=atom, name=atom.name) for atom in atoms
     ] + [
         Choice(value="Back", name="back")
     ]
 
-    atom = ListPrompt(
+    atom : Atom = ListPrompt(
         message="Choose atom:",
         choices=choices
     ).execute()
@@ -34,27 +36,28 @@ def build_atoms(
     if atom == "Back":
         return ""
 
-    expr = atom["name"]
-    atom_num_params = atom.get("num_params", 0)
-    
+    expr = atom.name
+    atom_params : list[Param] = atom.params
+    num_params = atom.get_num_params()
+
     # TODO handle list parameters (see ifz, balanced_fiz)
 
-    if atom_num_params > 0:
+    if num_params > 0:
 
-        atom_example = atom.get("example", None)
+        atom_example = atom.example
         if atom_example:
             print(f"Example: {atom_example}\n")
 
         params = []
 
-        for i in range(atom_num_params):
+        for i in range(num_params):
+
+            param_validator = ParameterValidator(operand_types=atom_params[i].operands)
 
             param = InputPrompt(
-                message=f"Parameter {i+1}:"
-            ).execute()
-
-            # TODO validate parameter based on atom specification
-            # TODO handle ? parameter 
+                message=f"Parameter {i+1}:",
+                validate=param_validator
+            ).execute() 
 
             params.append(param)
 
@@ -65,15 +68,15 @@ def build_atoms(
 
 
 def build_instruction_list(
-        combinators : dict,
-        atoms : dict,
+        combinators : list[Combinator],
+        atoms : list[Atom],
         title: str = "Build enclave body"
     ) -> str:
 
     expr = ""
 
     choices = [
-            Choice(value=combinator["name"], name=combinator["name"]) for combinator in combinators
+            Choice(value=combinator.name, name=combinator.name) for combinator in combinators
         ] + [
             Choice(value="Show", name="show"),
             Choice(value="Back", name="back"),
@@ -174,10 +177,14 @@ def build_enclave() -> None:
         print("No enclave atoms found. Please check the configuration.")
         return
     
+    atoms = [Atom.model_validate(atom) for atom in atoms]
+    
     combinators = enclave_instructions.get("combinators", [])
     if not combinators:
         print("No enclave combinators found. Please check the configuration.")
         return
+
+    combinators = [Combinator.model_validate(combinator) for combinator in combinators]
 
     
     body = build_instruction_list(

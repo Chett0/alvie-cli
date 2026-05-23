@@ -20,6 +20,8 @@ def choose_command(alvie_path: Path):
     args = []
     commands = get_commands().values()
 
+    # TODO manage commands with classes as the instructions
+
     while not done:
         choice = ListPrompt(
             message="What do you want to do:",

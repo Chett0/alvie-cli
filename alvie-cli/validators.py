@@ -3,6 +3,8 @@ from pathlib import Path
 from prompt_toolkit.validation import Validator, ValidationError
 from prompt_toolkit.document import Document
 
+from instructions import Operand
+
 class FileExtensionValidator(Validator):
 
     def __init__(self, expected_extension: str | None = None, must_exists: bool = True):
@@ -46,3 +48,20 @@ class IntValidator(Validator):
                 message="Input must be an integer",
                 cursor_position=document.cursor_position
             )
+        
+
+class ParameterValidator(Validator):
+
+    def __init__(self, operand_types: list[Operand]):
+        self.operand_types = operand_types
+
+    def validate(self, document: Document) -> None:
+        
+        for operand_type in self.operand_types:
+            if operand_type.is_valid(document.text):
+                return
+            
+        raise ValidationError(
+            message=f"Input does not match any of the expected operand types: {', '.join([operand_type.value for operand_type in self.operand_types])}",
+            cursor_position=document.cursor_position
+        )
