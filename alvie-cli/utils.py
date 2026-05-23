@@ -39,6 +39,12 @@ def run_alvie(
 
 def get_commands():
 
-    commands_path = Path(__file__).resolve().parent.parent / "commands" / "commands.json"
+    commands_path = Path(__file__).resolve().parent.parent / "config" / "commands.json"
     with commands_path.open("r") as file:
+        return json.load(file)
+
+def get_instructions():
+
+    instructions_path = Path(__file__).resolve().parent.parent / "config" / "instructions.json"
+    with instructions_path.open("r") as file:
         return json.load(file)

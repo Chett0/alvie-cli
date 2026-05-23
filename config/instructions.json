@@ -1,0 +1,53 @@
+{
+    "enclave" : {
+        "atoms" : [
+            {
+                "name" : "nop",
+                "description": "",
+                "num_params": 0
+            },
+            {
+                "name": "dint",
+                "description":"",
+                "num_params": 0
+            },
+            {
+                "name" : "mov",
+                "description": "",
+                "num_params": 2,
+                "example": "r1, r2"
+            },
+            {
+                "name" : "add",
+                "description": "",
+                "num_params" : 2,
+                "example": "r1, 5"
+            }
+        ],
+        "combinators" : [
+            {
+                "name" : "sequence ;",
+                "description": ""
+            },
+            {
+                "name" : "choice |",
+                "description": ""
+            },
+            {
+                "name" : "repeat *",
+                "description": ""
+            }, 
+            {
+                "name" : "group (...)",
+                "description": ""
+            },
+            {
+                "name" : "eps",
+                "description": ""
+            }
+        ]
+    },
+    "attacker" : {
+
+    }
+}

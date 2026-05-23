@@ -219,8 +219,10 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+.vscode/
 .bash_history
 .copilot/
 .gnupg/
 .vscode-server/
 .gitconfig
+enclaves/
