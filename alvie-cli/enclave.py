@@ -42,33 +42,43 @@ def build_atoms(
 
     if atom.name == "ifz":
 
-        sub_expr : str | None = None
         add_choice : Choice = Choice(value="add atom", name="add atom")
         choices = [
             add_choice,
             DONE_CHOICE
         ]
 
-        while True:
+        def build_sub_expr(atoms: list[Atom]) -> str:
 
-            action : str = ListPrompt(
-                message="Build ifz condition:",
-                choices=choices
-            ).execute()
+            expr : str = ""
 
-            if is_done(action):
-                if not sub_expr:
-                    sub_expr = "eps"
-                break
+            while True:
 
-            if action == add_choice.value:
-                new_sub_expr = build_atoms(atoms)
-                if sub_expr:
-                    sub_expr += f"; {new_sub_expr}"
-                else:
-                    sub_expr = new_sub_expr
+                action : str = ListPrompt(
+                    message="Build ifz condition:",
+                    choices=choices
+                ).execute()
 
-        expr += f" ({sub_expr})"
+                if is_done(action):
+                    if not expr:
+                        expr = "eps"
+                    break
+
+                if action == add_choice.value:
+                    sub_expr = build_atoms(atoms)
+                    if expr:
+                        expr += f"; {sub_expr}"
+                    else:
+                        expr = sub_expr
+
+            return expr
+        
+        # TODO verify if nested ifz instructions isn't allowed even in enclave
+        sub_atoms : list[Atom] = [atom for atom in atoms if atom.name != "ifz"]
+        left_sub_expr = build_sub_expr(sub_atoms)
+        right_sub_expr = build_sub_expr(sub_atoms)
+
+        expr += f" ({left_sub_expr}) ({right_sub_expr})"
 
 
     num_params : int = atom.get_num_params()
