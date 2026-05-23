@@ -36,6 +36,8 @@ def build_atoms(
 
     expr = atom["name"]
     atom_num_params = atom.get("num_params", 0)
+    
+    # TODO handle list parameters (see ifz, balanced_fiz)
 
     if atom_num_params > 0:
 
@@ -90,32 +92,58 @@ def build_instruction_list(
         if action == "Back":
             return ""
         
-        if action == "Show":
+        if action == "eps":
+            if expr:
+                expr += f"; eps"
+            else:
+                expr = "eps"
+            
+        elif action == "Show":
             enclave_text = render_enclave(expr)
             print_enclave(enclave_text)
-            continue
 
-        if action == "sequence ;":
+        elif action == "sequence ;":
             sub_expr = build_atoms(atoms)
-            if not sub_expr:
-                continue
-            expr += f"{sub_expr}; "
+            if expr:
+                expr += f"; {sub_expr}"
+            else:
+                expr = sub_expr
 
         elif action == "choice |":
-            sub_expr = build_instruction_list(
+            if not expr:
+                left_sub_expr = build_instruction_list(
+                    combinators, 
+                    atoms, 
+                    "Build left side of choice"
+                )
+                expr = left_sub_expr
+
+            right_sub_expr = build_instruction_list(
                 combinators, 
                 atoms, 
                 "Build right side of choice"
             )
-            if not sub_expr:
-                continue
-            expr = f"{expr}| {sub_expr}"
 
-        # elif action == "repeat *":
-            # TODO add logic for repeat
+            if right_sub_expr:
+                expr = f"{expr} | {right_sub_expr}"
 
-        # elif action == "group (...)":
-            # TODO add logic for group
+        elif action == "repeat *":
+            sub_expr = expr if expr else build_atoms(atoms)
+            expr = f"({sub_expr})*"
+
+        elif action == "group (...)":
+            sub_expr = build_instruction_list(
+                combinators, 
+                atoms, 
+                "Build group expression"
+            )
+            if expr:
+                expr += f"; ({sub_expr})"
+            else:
+                expr = f"({sub_expr})"
+
+        else:
+            raise RuntimeError(f"Unknown action: {action}")
 
     return expr if expr else "eps"
 
