@@ -1,6 +1,6 @@
 {
     "enclave" : {
-        "atoms" : [
+        "actions" : [
             {
                 "name" : "nop",
                 "description": "",
@@ -35,11 +35,23 @@
                         "operands" : ["reg", "imm"]
                     }
                 ],
-                "example": "r1, 5"
+                "example" : "r1, 5"
             },
             {
-                "name": "ifz",
-                "description": ""
+                "name" : "rst",
+                "description" : ""
+            },
+            {
+                "name" : "ubr",
+                "description" : ""
+            },
+            {
+                "name" : "balanced_ifz",
+                "description" : ""
+            },
+            {
+                "name" : "ifz",
+                "description" : ""
             }
         ],
         "combinators" : [

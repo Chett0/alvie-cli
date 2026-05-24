@@ -65,10 +65,11 @@ class Operand(Enum):
 class Param(BaseModel):
     operands: list[Operand] = []
 
-
-class Atom(BaseModel):
+class Instruction(BaseModel):
     name: str
     description: str
+
+class Atom(Instruction):
     params: list[Param] = []
     example: str | None = None
 
