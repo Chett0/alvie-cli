@@ -5,6 +5,8 @@ from InquirerPy.base.control import Choice
 
 from utils import BACK_CHOICE, DONE_CHOICE, get_alvie_code_path, get_commands, is_back, is_done, run_alvie
 from input_selectors import select_file, select_directory, select_choice, select_boolean, select_int
+from instructions import Entity
+from entities import build_enclave, build_attacker
 
 types_selector = {
     "filename" : select_file,
@@ -92,11 +94,9 @@ def choose_args(command: dict) -> tuple[bool, list[str]]:
     # /home/alvie/spec-lib/example/enclave.etdl requires explicit secret in '?'
     args.extend(["--secret", "0"])
     
-    
-    
     return True, args
 
-def main():
+def excution():
 
     try:
         alvie_path = get_alvie_code_path()
@@ -105,6 +105,37 @@ def main():
         raise SystemExit(1)
 
     choose_command(alvie_path)
+    
+def build(entity: Entity):
+    if entity == Entity.ENCLAVE:
+        build_enclave()
+    elif entity == Entity.ATTACKER:
+        build_attacker()
+
+def main():
+
+    print("Welcome to the Alvie CLI!\n")
+    choice = ListPrompt(
+        message="What do you want to do:",
+        choices=[
+            Choice(value="execute", name="Execute a command") 
+        ] + [
+            Choice(value=entity, name=f"Build {entity.value}")
+            for entity in Entity
+        ] + [
+            Choice(value="exit", name="Exit")
+        ]
+    ).execute()
+
+    if choice == "execute":
+        excution()
+    elif choice == "exit":
+        print("Goodbye!")
+        raise SystemExit(0)
+    else:
+        build(choice)
+
+    
 
 
 if __name__ == "__main__":
