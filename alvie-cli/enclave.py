@@ -7,17 +7,20 @@ from pathlib import Path
 
 from utils import BACK_CHOICE, DONE_CHOICE, get_instructions, is_back, is_done
 from validators import FileExtensionValidator, ParameterValidator
-from instructions import Combinator, Atom, Param, Instruction
+from instructions import Combinator, AttackerSection, Entity, Instruction
 
-def print_enclave(enclave: str, output_path: Path | None = None) -> None:
-    print("\nGenerated enclave:\n")
-    print(enclave)
+def print_entity(
+        entity: str, 
+        output_path: Path | None = None
+    ) -> None:
+    print("\nGenerated entity:\n")
+    print(entity)
     if output_path:
         print(f"Wrote: {output_path}")
 
 
 def build_instructions(
-        instructions : list[Instruction] | list[Atom]
+        instructions : list[Instruction] 
     ) -> str:
 
     expr : str = ""
@@ -27,8 +30,6 @@ def build_instructions(
     ] + [
         BACK_CHOICE
     ]
-
-    # TODO defining atoms'description, parameters and examples
 
     instr : Instruction = ListPrompt(
         message="Choose atom:",
@@ -103,7 +104,7 @@ def build_instructions(
 
             if action == add_choice.value:
 
-                atoms : list[Atom] = [instr for instr in instructions if isinstance(instr, Atom)]
+                atoms : list[Instruction] = [instr for instr in instructions if instr.atom]
                 new_sub_expr = build_instructions(atoms)
                 if sub_expr:
                     sub_expr += f"; {new_sub_expr}"
@@ -114,21 +115,18 @@ def build_instructions(
 
     else:
 
-        atom : Atom | None = instr if isinstance(instr, Atom) else None
-        if not atom:
-            return expr
-        num_params : int = atom.get_num_params()
+        num_params : int = instr.get_num_params()
 
         if num_params > 0:
 
-            if atom.example:
-                print(f"Example: {atom.example}\n")
+            if instr.example:
+                print(f"Example: {instr.example}\n")
 
             params = []
 
             for i in range(num_params):
 
-                param_validator = ParameterValidator(operand_types=atom.params[i].operands)
+                param_validator = ParameterValidator(operand_types=instr.params[i].operands)
 
                 param = InputPrompt(
                     message=f"Parameter {i+1}:",
@@ -146,7 +144,7 @@ def build_instructions(
 def build_combinators(
         combinators : list[Combinator],
         atoms : list[Instruction],
-        title: str = "Build enclave body"
+        section: str = "enclave"
     ) -> str:
 
     expr : str = ""
@@ -161,7 +159,7 @@ def build_combinators(
 
     while True:
         action : str = ListPrompt(
-            message=title,
+            message=f"Build {section} body",
             choices= choices 
         ).execute()
 
@@ -178,8 +176,7 @@ def build_combinators(
                 expr = "eps"
             
         elif action == "Show":
-            enclave_text : str = render_enclave(expr)
-            print_enclave(enclave_text)
+            print(f"\nCurrent expression:\n{expr}\n")
 
         elif action == "sequence ;":
             sub_expr : str = build_instructions(atoms)
@@ -226,43 +223,77 @@ def build_combinators(
 
     return expr if expr else "eps"
 
-
-def render_enclave(body: str) -> str:
-    return f"""enclave {{
-  {body}
-}};
-"""
-
-
-def build_enclave() -> None:
-
-    print("Victim enclave builder\n")
+def get_combinators_actions(
+        type : Entity
+    ) -> tuple[list[Combinator], list[Instruction]]:
 
     instructions : dict = get_instructions()
     if not instructions:
-        print("No instructions found. Please check the configuration.")
-        return
+        raise RuntimeError("No instructions found. Please check the configuration.")
     
-    enclave_instructions : dict = instructions.get("enclave", [])
-    if not enclave_instructions:
-        print("No enclave instructions found. Please check the configuration.")
-        return
+    entity_instructions : dict = instructions.get(type.value, [])
+    if not entity_instructions:
+        raise RuntimeError("No entity instructions found. Please check the configuration.")
     
-    actions : list = enclave_instructions.get("actions", [])
-    if not actions:
-        print("No enclave actions found. Please check the configuration.")
-        return
+    raw_actions : list = entity_instructions.get("actions", [])
+    if not raw_actions:
+        raise RuntimeError("No entity actions found. Please check the configuration.")
     
-    # atoms must define params (even if empty) to be correctly validated as Atom instead of Instruction
-    actions = [Instruction.model_validate(action) if action.get("params") == None else Atom.model_validate(action) for action in actions]
+    actions : list[Instruction] = [Instruction.model_validate(action) for action in raw_actions]
     
-    combinators : list = enclave_instructions.get("combinators", [])
-    if not combinators:
-        print("No enclave combinators found. Please check the configuration.")
-        return
+    raw_combinators : list = entity_instructions.get("combinators", [])
+    if not raw_combinators:
+        raise RuntimeError("No entity combinators found. Please check the configuration.")
 
-    combinators = [Combinator.model_validate(combinator) for combinator in combinators]
+    combinators : list[Combinator] = [Combinator.model_validate(combinator) for combinator in raw_combinators]
 
+    return combinators, actions
+
+
+def save_entity(
+        text : str,
+        file_extension_validator : FileExtensionValidator,
+) -> Path | None: 
+    
+    save = ListPrompt(
+        message="Save generated entity?",
+        choices=[
+            Choice(value=True, name="yes"),
+            Choice(value=False, name="no")
+        ]
+    ).execute()
+
+    if not save:
+        return None
+    
+    output_path : str = FilePathPrompt(
+        message="Output file:",
+        default="enclaves/victim.etdl",
+        validate=file_extension_validator
+    ).execute()
+
+    path = Path(output_path)
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def render_section(
+        body: str,
+        title: str
+    ) -> str:
+    return f"""{title} {{
+  {body}
+}};
+"""
+    
+
+def build_enclave() -> None:
+
+    # TODO define enclave instructions
+
+    print("Victim enclave builder\n")
+
+    combinators, actions = get_combinators_actions(type=Entity.ENCLAVE)
     
     body : str = build_combinators(
         combinators=combinators,
@@ -270,20 +301,55 @@ def build_enclave() -> None:
     )
     if not body:
         return
-    enclave_text : str = render_enclave(body)
+    enclave_text : str = render_section(body, title="enclave")
 
-    output_path : str = FilePathPrompt(
-        message="Output file:",
-        default="enclaves/victim.etdl",
-        validate=FileExtensionValidator(
-            expected_extension=".etdl", 
+    output_path : Path | None = save_entity(
+        text=enclave_text,
+        file_extension_validator=FileExtensionValidator(
+            expected_extension=".etdl",
             must_exists=False
         )
-    ).execute()
+    )
 
-    Path(output_path).write_text(enclave_text, encoding="utf-8")
-    print_enclave(enclave_text, output_path=Path(output_path))
+    print_entity(
+        entity=enclave_text, 
+        output_path=output_path
+    )
 
 
-if __name__ == "__main__":
-    build_enclave()
+def build_attacker() -> None:
+
+    # TODO define attacker instructions
+    # TODO verify if create instructions parameters can be validated with ParameterValidator
+    # TODO maybe split atoms and combinators in json config because they are the same for enclave and attacker?
+
+    print("Attacker builder\n")
+
+    combinators, actions = get_combinators_actions(type=Entity.ATTACKER)
+    section_texts : list[str] = []
+
+    for section in AttackerSection:
+        section_body : str = build_combinators(
+            combinators=combinators,
+            atoms=actions,
+            section=section.value
+        )
+        if not section_body:
+            return
+        section_text : str = render_section(section_body, title=section.value)
+        section_texts.append(section_text)
+
+    attacker_text : str = "\n".join(section_texts)
+
+    output_path : Path | None = save_entity(
+        text=attacker_text,
+        file_extension_validator=FileExtensionValidator(
+            expected_extension=".atdl",
+            must_exists=False
+        )
+    )
+
+    print_entity(
+        entity=attacker_text, 
+        output_path=output_path
+    )

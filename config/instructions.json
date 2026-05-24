@@ -4,12 +4,14 @@
             {
                 "name" : "nop",
                 "description": "",
-                "params" : []
+                "params" : [],
+                "atom" : true
             },
             {
                 "name": "dint",
                 "description":"",
-                "params" : []
+                "params" : [],
+                "atom" : true
             },
             {
                 "name" : "mov",
@@ -22,7 +24,8 @@
                         "operands" : ["reg"]
                     }
                 ],
-                "example": "r1, r2"
+                "example": "r1, r2",
+                "atom" : true
             },
             {
                 "name" : "add",
@@ -35,23 +38,28 @@
                         "operands" : ["reg", "imm"]
                     }
                 ],
-                "example" : "r1, 5"
+                "example" : "r1, 5",
+                "atom" : true
             },
             {
                 "name" : "rst",
-                "description" : ""
+                "description" : "",
+                "atom" : false
             },
             {
                 "name" : "ubr",
-                "description" : ""
+                "description" : "",
+                "atom" : false
             },
             {
                 "name" : "balanced_ifz",
-                "description" : ""
+                "description" : "",
+                "atom" : false
             },
             {
                 "name" : "ifz",
-                "description" : ""
+                "description" : "",
+                "atom" : false
             }
         ],
         "combinators" : [
@@ -78,6 +86,49 @@
         ]
     },
     "attacker" : {
-
+        "actions" : [
+            {
+                "name" : "rst",
+                "description" : "",
+                "atom" : false
+            },
+            {
+                "name" : "timer_enable",
+                "description" : "",
+                "params" : [
+                    {
+                        "operands" : ["imm"]
+                    }
+                ],
+                "atom" : false
+            },
+            {
+                "name" : "nop",
+                "description" : "",
+                "atom" : true
+            }
+        ],
+        "combinators" : [
+            {
+                "name" : "sequence ;",
+                "description": ""
+            },
+            {
+                "name" : "choice |",
+                "description": ""
+            },
+            {
+                "name" : "repeat *",
+                "description": ""
+            }, 
+            {
+                "name" : "group (...)",
+                "description": ""
+            },
+            {
+                "name" : "eps",
+                "description": ""
+            }
+        ]
     }
 }

@@ -1,6 +1,15 @@
 from enum import Enum
 from pydantic import BaseModel
 
+class AttackerSection(Enum):
+    ISR = "isr"
+    PREPARE = "prepare"
+    CLEANUP = "cleanup"
+
+class Entity(Enum):
+    ENCLAVE = "enclave"
+    ATTACKER = "attacker"
+
 class Combinator(BaseModel):
     name: str
     description: str
@@ -68,10 +77,9 @@ class Param(BaseModel):
 class Instruction(BaseModel):
     name: str
     description: str
-
-class Atom(Instruction):
     params: list[Param] = []
     example: str | None = None
+    atom : bool = False
 
     def get_num_params(self) -> int:
         return len(self.params)
