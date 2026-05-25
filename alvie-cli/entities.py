@@ -20,7 +20,8 @@ def print_entity(
 
 
 def build_instructions(
-        instructions : list[Instruction] 
+        instructions : list[Instruction],
+        message = "Choose instruction:"
     ) -> str:
 
     expr : str = ""
@@ -32,7 +33,7 @@ def build_instructions(
     ]
 
     instr : Instruction = ListPrompt(
-        message="Choose atom:",
+        message=message,
         choices=choices
     ).execute()
 
@@ -42,7 +43,6 @@ def build_instructions(
     expr = instr.name
 
     if instr.name == "ifz":
-
         add_choice : Choice = Choice(value="add instruction", name="add instruction")
         choices = [
             add_choice,
@@ -50,7 +50,6 @@ def build_instructions(
         ]
 
         def build_sub_expr(atoms: list[Instruction]) -> str:
-
             expr : str = ""
 
             while True:
@@ -82,7 +81,6 @@ def build_instructions(
         expr += f" ({left_sub_expr}) ({right_sub_expr})"
 
     elif instr.name == "balanced_ifz":
-
         sub_expr : str | None = None
         add_choice : Choice = Choice(value="add atom", name="add atom")
         choices = [
@@ -105,7 +103,10 @@ def build_instructions(
             if action == add_choice.value:
 
                 atoms : list[Instruction] = [instr for instr in instructions if instr.atom]
-                new_sub_expr = build_instructions(atoms)
+                new_sub_expr = build_instructions(
+                    atoms,
+                    message="Choose atom:"
+                )
                 if sub_expr:
                     sub_expr += f"; {new_sub_expr}"
                 else:
@@ -114,7 +115,6 @@ def build_instructions(
         expr += f" ({sub_expr})"
 
     else:
-
         num_params : int = instr.get_num_params()
 
         if num_params > 0:
@@ -135,7 +135,10 @@ def build_instructions(
 
                 params.append(param)
 
-            expr = f"{expr} {', '.join(params)}"
+            if instr.name == "create":
+                expr = f"{expr} <{', '.join(params)}>"
+            else:
+                expr = f"{expr} {', '.join(params)}"
 
     return expr
 
@@ -289,7 +292,7 @@ def render_section(
 
 def build_enclave() -> None:
 
-    # TODO define enclave instructions
+    # TODO define enclave instructions in json config
 
     print("Victim enclave builder\n")
 
@@ -319,8 +322,7 @@ def build_enclave() -> None:
 
 def build_attacker() -> None:
 
-    # TODO define attacker instructions
-    # TODO verify if create instructions parameters can be validated with ParameterValidator
+    # TODO define attacker instructions in json config
     # TODO maybe split atoms and combinators in json config because they are the same for enclave and attacker?
 
     print("Attacker builder\n")

@@ -1,4 +1,5 @@
 from enum import Enum
+import re
 from pydantic import BaseModel
 
 class AttackerSection(Enum):
@@ -21,6 +22,7 @@ class Operand(Enum):
     MEMORY_LABEL = "mem"
     IMMEDIATE = "imm"
     SECRET = "?"
+    IDENT = "ident"
 
     def is_valid(self, value: str) -> bool:
 
@@ -61,6 +63,10 @@ class Operand(Enum):
         elif self == Operand.SECRET:
             return value == "?"
         
+        elif self == Operand.IDENT:
+            ident_rex = re.compile(r"^[A-Za-z0-9_-]+$")
+            return bool(ident_rex.fullmatch(value))
+
         return False
 
     @staticmethod

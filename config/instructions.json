@@ -106,6 +106,24 @@
                 "name" : "nop",
                 "description" : "",
                 "atom" : true
+            },
+            {
+                "name": "create",
+                "description": "",
+                "params": [
+                    {
+                        "operands" : ["ident"]
+                    },
+                    {
+                        "operands" : ["ident"]
+                    },
+                    {
+                        "operands" : ["ident"]
+                    },
+                    {
+                        "operands" : ["ident"]
+                    }
+                ]
             }
         ],
         "combinators" : [
