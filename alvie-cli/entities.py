@@ -172,57 +172,61 @@ def build_combinators(
         if is_back(action):
             return ""
         
-        if action == "eps":
-            if expr:
-                expr += f"; eps"
-            else:
-                expr = "eps"
+        match action:
+            case "eps":
+                if expr:
+                    expr += f"; eps"
+                else:
+                    expr = "eps"
             
-        elif action == "Show":
-            print(f"\nCurrent expression:\n{expr}\n")
+            case "Show":
+                print(f"\nCurrent expression:\n{expr}\n")
 
-        elif action == "sequence ;":
-            sub_expr : str = build_instructions(atoms)
-            if expr:
-                expr += f"; {sub_expr}"
-            else:
-                expr = sub_expr
+            case "sequence ;":
+                sub_expr : str = build_instructions(atoms)
+                if expr:
+                    expr += f"; {sub_expr}"
+                else:
+                    expr = sub_expr
 
-        elif action == "choice |":
-            if not expr:
-                left_sub_expr : str = build_combinators(
+            case "choice |":
+                if not expr:
+                    left_sub_expr : str = build_combinators(
+                        combinators, 
+                        atoms, 
+                        "Build left side of choice"
+                    )
+                    expr = left_sub_expr
+
+                if expr:
+                    right_sub_expr : str = build_combinators(
+                        combinators, 
+                        atoms, 
+                        "Build right side of choice"
+                    )
+
+                    if right_sub_expr:
+                        expr = f"{expr} | {right_sub_expr}"
+
+            case "repeat *":
+                sub_expr : str = expr if expr else build_instructions(atoms)
+                if sub_expr:
+                    expr = f"({sub_expr})*"
+
+            case "group (...)":
+                sub_expr : str = build_combinators(
                     combinators, 
                     atoms, 
-                    "Build left side of choice"
+                    "Build group expression"
                 )
-                expr = left_sub_expr
+                if sub_expr:
+                    if expr:
+                        expr += f"; ({sub_expr})"
+                    else:
+                        expr = f"({sub_expr})"
 
-            right_sub_expr : str = build_combinators(
-                combinators, 
-                atoms, 
-                "Build right side of choice"
-            )
-
-            if right_sub_expr:
-                expr = f"{expr} | {right_sub_expr}"
-
-        elif action == "repeat *":
-            sub_expr : str = expr if expr else build_instructions(atoms)
-            expr = f"({sub_expr})*"
-
-        elif action == "group (...)":
-            sub_expr : str = build_combinators(
-                combinators, 
-                atoms, 
-                "Build group expression"
-            )
-            if expr:
-                expr += f"; ({sub_expr})"
-            else:
-                expr = f"({sub_expr})"
-
-        else:
-            raise RuntimeError(f"Unknown action: {action}")
+            case _:
+                raise RuntimeError(f"Unknown action: {action}")
 
     return expr if expr else "eps"
 
@@ -308,10 +312,7 @@ def build_enclave() -> None:
 
     output_path : Path | None = save_entity(
         text=enclave_text,
-        file_extension_validator=FileExtensionValidator(
-            expected_extension=".etdl",
-            must_exists=False
-        )
+        file_extension_validator=FileExtensionValidator.enclave_file_validator()
     )
 
     print_entity(
@@ -345,10 +346,7 @@ def build_attacker() -> None:
 
     output_path : Path | None = save_entity(
         text=attacker_text,
-        file_extension_validator=FileExtensionValidator(
-            expected_extension=".atdl",
-            must_exists=False
-        )
+        file_extension_validator=FileExtensionValidator.attacker_file_validator()
     )
 
     print_entity(

@@ -24,6 +24,22 @@ class FileExtensionValidator(Validator):
                 cursor_position=document.cursor_position
             ) 
         
+    @classmethod
+    def attacker_file_validator(cls : type["FileExtensionValidator"]) -> "FileExtensionValidator":
+        return cls(
+            expected_extension=".atdl",
+            must_exists=False
+        )
+    
+    @classmethod
+    def enclave_file_validator(cls : type["FileExtensionValidator"]) -> "FileExtensionValidator":
+        return cls(
+            expected_extension=".etdl",
+            must_exists=False
+        )
+
+
+
 class DirectoryValidator(Validator):
 
     def __init__(self, must_exists: bool = True):

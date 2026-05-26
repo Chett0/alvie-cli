@@ -115,27 +115,26 @@ def build(entity: Entity):
 def main():
 
     print("Welcome to the Alvie CLI!\n")
-    choice = ListPrompt(
-        message="What do you want to do:",
-        choices=[
-            Choice(value="execute", name="Execute a command") 
-        ] + [
-            Choice(value=entity, name=f"Build {entity.value}")
-            for entity in Entity
-        ] + [
-            Choice(value="exit", name="Exit")
-        ]
-    ).execute()
-
-    if choice == "execute":
-        excution()
-    elif choice == "exit":
-        print("Goodbye!")
-        raise SystemExit(0)
-    else:
-        build(choice)
-
     
+    while True:
+        choice = ListPrompt(
+            message="What do you want to do:",
+            choices=[
+                Choice(value="execute", name="Execute a command") 
+            ] + [
+                Choice(value=entity, name=f"Build {entity.value}")
+                for entity in Entity
+            ] + [
+                Choice(value="exit", name="Exit")
+            ]
+        ).execute()
+
+        if choice == "execute":
+            excution()
+        elif choice == "exit":
+            return
+        else:
+            build(choice)
 
 
 if __name__ == "__main__":
