@@ -4,6 +4,7 @@ from InquirerPy.prompts.list import ListPrompt
 from InquirerPy.base.control import Choice
 
 from pathlib import Path
+import os
 
 from utils import BACK_CHOICE, DONE_CHOICE, get_instructions, is_back, is_done
 from validators import FileExtensionValidator, ParameterValidator
@@ -16,7 +17,7 @@ def print_entity(
     print("\nGenerated entity:\n")
     print(entity)
     if output_path:
-        print(f"Wrote: {output_path}")
+        print(f"Saved in: {output_path}\n")
 
 
 def build_instructions(
@@ -259,6 +260,7 @@ def get_combinators_actions(
 
 def save_entity(
         text : str,
+        default: str,
         file_extension_validator : FileExtensionValidator,
 ) -> Path | None: 
     
@@ -272,14 +274,15 @@ def save_entity(
 
     if not save:
         return None
-    
+        
     output_path : str = FilePathPrompt(
         message="Output file:",
-        default="enclaves/victim.etdl",
+        default=default,
         validate=file_extension_validator
     ).execute()
 
     path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
     return path
 
@@ -310,8 +313,10 @@ def build_enclave() -> None:
         return
     enclave_text : str = render_section(body, title="enclave")
 
+    ALVIE_CODE_PATH = os.environ["ALVIE_CODE_PATH"]
     output_path : Path | None = save_entity(
         text=enclave_text,
+        default=f"{ALVIE_CODE_PATH}/enclaves/victim.etdl",
         file_extension_validator=FileExtensionValidator.enclave_file_validator()
     )
 
@@ -344,8 +349,10 @@ def build_attacker() -> None:
 
     attacker_text : str = "\n".join(section_texts)
 
+    ALVIE_CODE_PATH = os.environ["ALVIE_CODE_PATH"]
     output_path : Path | None = save_entity(
         text=attacker_text,
+        default=f"{ALVIE_CODE_PATH}/attackers/attacker.atdl",
         file_extension_validator=FileExtensionValidator.attacker_file_validator()
     )
 

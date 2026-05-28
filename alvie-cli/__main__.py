@@ -113,8 +113,7 @@ def build(entity: Entity):
         build_attacker()
 
 def main():
-
-    print("Welcome to the Alvie CLI!\n")
+    print("\nWelcome to the Alvie CLI!\n")
     
     while True:
         choice = ListPrompt(

@@ -42,7 +42,7 @@ def run_alvie(
     #                 )
     
     exe = f"{alvie_path}/_build/default/bin/{executable_name}.exe"
-    print(f"Running {exe} with arguments")
+    print(f"\nRunning {exe} with arguments")
     for i in range(len(args)//2):
         print(f"{args[2*i]}: {args[2*i+1]}")
     print()

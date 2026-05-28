@@ -46,8 +46,8 @@ class Operand(Enum):
         
         elif self == Operand.IMMEDIATE:
             # Accepting both X and #X ?
-            if value.isdigit():
-                return True
+            # if value.isdigit():
+                # return True
             
             num  = value[1:]
 
