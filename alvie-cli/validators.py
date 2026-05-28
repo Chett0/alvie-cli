@@ -2,6 +2,7 @@ from pathlib import Path
 
 from prompt_toolkit.validation import Validator, ValidationError
 from prompt_toolkit.document import Document
+from InquirerPy.base.control import Choice
 
 from instructions import Operand
 
@@ -78,6 +79,19 @@ class ParameterValidator(Validator):
                 return
             
         raise ValidationError(
-            message=f"Input does not match any of the expected operand types: {', '.join([operand_type.value for operand_type in self.operand_types])}",
+            # message=f"Input does not match any of the expected operand types: {', '.join([operand_type.value for operand_type in self.operand_types])}",
+            message=f"Input does not match any of the expected operand types",
             cursor_position=document.cursor_position
         )
+    
+class ChoiceValidator(Validator):
+
+    def __init__(self, choices: list[Choice]):
+        self.choices_values = [choice.value for choice in choices]
+
+    def validate(self, document: Document) -> None:
+        if document.text not in self.choices_values:
+            raise ValidationError(
+                message="Please select a valid instruction from the list",
+                cursor_position=document.cursor_position,
+            )

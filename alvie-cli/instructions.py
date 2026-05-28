@@ -2,6 +2,8 @@ from enum import Enum
 import re
 from pydantic import BaseModel
 
+from InquirerPy.base.control import Choice
+
 class AttackerSection(Enum):
     ISR = "isr"
     PREPARE = "prepare"
@@ -10,10 +12,6 @@ class AttackerSection(Enum):
 class Entity(Enum):
     ENCLAVE = "enclave"
     ATTACKER = "attacker"
-
-class Combinator(BaseModel):
-    name: str
-    description: str
 
 
 class Operand(Enum):
@@ -89,3 +87,7 @@ class Instruction(BaseModel):
 
     def get_num_params(self) -> int:
         return len(self.params)
+
+class Combinator(BaseModel):
+    name: str
+    description: str

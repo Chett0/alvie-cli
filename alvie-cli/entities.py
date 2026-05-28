@@ -2,12 +2,13 @@ from InquirerPy.prompts.input import InputPrompt
 from InquirerPy.prompts.filepath import FilePathPrompt
 from InquirerPy.prompts.list import ListPrompt
 from InquirerPy.base.control import Choice
+from InquirerPy.prompts.fuzzy import FuzzyPrompt
 
 from pathlib import Path
 
-from utils import BACK_CHOICE, DONE_CHOICE, get_instructions, is_back, is_done
-from validators import FileExtensionValidator, ParameterValidator
-from instructions import Combinator, AttackerSection, Entity, Instruction
+from utils import BACK_CHOICE, DONE_CHOICE, HELP_CHOICE, SHOW_CHOICE, get_instructions, is_back, is_done, is_help, is_show
+from validators import FileExtensionValidator, ParameterValidator, ChoiceValidator
+from instructions import AttackerSection, Combinator, Entity, Instruction
 
 def print_entity(
         entity: str, 
@@ -18,27 +19,77 @@ def print_entity(
     if output_path:
         print(f"Wrote: {output_path}")
 
+# A global variable that defines if using description or not?
+def build_choices(
+        items : list[Combinator] | list[Instruction],
+        extra_choices : list[Choice] = [],
+        include_desc : bool = False
+    ) -> list[Choice]:
+    """
+    Build a list of choices for the given list of combinators or instructions
+
+    Args:
+        items: list of combinators or instructions to build choices from
+        extra_choices: list of extra choices to include in the returned list of choices
+        include_desc: whether to include the description of the combinators/instructions in the choice name
+    """
+
+    if include_desc:
+        choices = [
+            *map(lambda item: Choice(value=item, name=f"{item.name} - {item.description}"), items),
+            *extra_choices
+        ]
+    else:
+        choices = [
+            *map(lambda item: Choice(value=item, name=item.name), items),
+            *extra_choices
+        ]
+
+    return choices
 
 def build_instructions(
         instructions : list[Instruction],
-        message = "Choose instruction:"
+        message = "Choose instruction:",
+        help=False
     ) -> str:
 
     expr : str = ""
 
-    choices : list[Choice] = [
-        Choice(value=instr, name=instr.name) for instr in instructions
-    ] + [
-        BACK_CHOICE
-    ]
+    extra_choices : list[Choice] = [] 
+    if not help:
+        extra_choices.append(HELP_CHOICE)
+    extra_choices.append(BACK_CHOICE)
 
-    instr : Instruction = ListPrompt(
+    choices = build_choices(
+        items=instructions,
+        extra_choices=extra_choices,
+        include_desc=help
+    )
+
+    instr : Instruction = FuzzyPrompt(
         message=message,
-        choices=choices
+        choices=choices,
+        max_height="70%",
+        validate=ChoiceValidator(choices=choices),
+        invalid_message="Please select a valid instruction from the list"
     ).execute()
 
     if is_back(instr):
         return ""
+    
+    if is_help(instr):
+        sub_expr = build_instructions(
+            instructions=instructions,
+            message="Choose instruction:",
+            help=True
+        )
+
+        if expr:
+            if sub_expr:
+                expr += f"; {sub_expr}"
+        else:
+            expr = sub_expr
+        return expr
 
     expr = instr.name
 
@@ -118,14 +169,12 @@ def build_instructions(
         num_params : int = instr.get_num_params()
 
         if num_params > 0:
-
             if instr.example:
                 print(f"Example: {instr.example}\n")
 
             params = []
 
             for i in range(num_params):
-
                 param_validator = ParameterValidator(operand_types=instr.params[i].operands)
 
                 param = InputPrompt(
@@ -147,23 +196,30 @@ def build_instructions(
 def build_combinators(
         combinators : list[Combinator],
         atoms : list[Instruction],
-        section: str = "enclave"
+        section: str = "enclave",
+        help=False
     ) -> str:
 
     expr : str = ""
 
-    choices : list[Choice] = [
-            Choice(value=combinator.name, name=combinator.name) for combinator in combinators
-        ] + [
-            Choice(value="Show", name="show"),
-            BACK_CHOICE,
-            DONE_CHOICE
-        ]
+    extra_choices: list[Choice] = []
+    if help:
+        extra_choices.append(HELP_CHOICE)
+    extra_choices.extend([SHOW_CHOICE, BACK_CHOICE, DONE_CHOICE])
+
+    choices = build_choices(
+        items=combinators,
+        extra_choices=extra_choices,
+        include_desc=help
+    )
 
     while True:
-        action : str = ListPrompt(
+        action = FuzzyPrompt(
             message=f"Build {section} body",
-            choices= choices 
+            choices= choices,
+            max_height="70%",
+            validate=ChoiceValidator(choices=choices),
+            invalid_message="Please select a valid instruction from the list"
         ).execute()
 
         if is_done(action):
@@ -171,16 +227,32 @@ def build_combinators(
 
         if is_back(action):
             return ""
+
+        if is_help(action):
+            sub_expr = build_combinators(
+                combinators=combinators,
+                atoms=atoms,
+                section=section,
+                help=True
+            )
+
+            if expr:
+                if sub_expr != "eps":
+                    expr += f"; {sub_expr}"
+            else:
+                expr = sub_expr
+            return expr
         
-        match action:
+        if is_show(action):
+            print(f"\nCurrent expression:\n{expr}\n")
+            continue
+        
+        match action.name:
             case "eps":
                 if expr:
                     expr += f"; eps"
                 else:
                     expr = "eps"
-            
-            case "Show":
-                print(f"\nCurrent expression:\n{expr}\n")
 
             case "sequence ;":
                 sub_expr : str = build_instructions(atoms)
