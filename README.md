@@ -7,24 +7,11 @@ Ensure you have the following installed on your system:
 
 ## Execution
 
-Build and run docker container
+Build and run docker container:
 
 ```bash
-docker pull matteobusi/alvie
-docker build -t alvie-cli .
-docker run -it alvie-cli
-```
-
-<!-- Create a file named .env in the root directory 
-
-```env
-ALVIE_CODE_PATH=path/to/alvie/codebase
-``` -->
-
-Activate python virtual environment
-
-```bash
-source venv/bin/activate
+make pull # Pull the base image: matteobusi/alvie
+make # Build and run the docker container
 ```
 
 Run 

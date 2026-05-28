@@ -6,7 +6,7 @@ from InquirerPy.base.control import Choice
 from pathlib import Path
 import os
 
-from utils import BACK_CHOICE, DONE_CHOICE, get_instructions, is_back, is_done
+from utils import BACK_CHOICE, DONE_CHOICE, get_instructions, get_combinators, is_back, is_done
 from validators import FileExtensionValidator, ParameterValidator
 from instructions import Combinator, AttackerSection, Entity, Instruction
 
@@ -120,8 +120,11 @@ def build_instructions(
 
         if num_params > 0:
 
-            if instr.example:
-                print(f"Example: {instr.example}\n")
+            if instr.examples:
+                print(f"Examples:")
+                for example in instr.examples:
+                    print(f"  - {instr.name} {example}")
+                print()
 
             params = []
 
@@ -234,26 +237,36 @@ def build_combinators(
 def get_combinators_actions(
         type : Entity
     ) -> tuple[list[Combinator], list[Instruction]]:
+    
+    # get combinators
+    raw_combinators : list = get_combinators()
+    if not raw_combinators:
+        raise RuntimeError("No entity combinators found. Please check the configuration.")
+    combinators : list[Combinator] = [
+        Combinator.model_validate(combinator) 
+        for combinator in raw_combinators
+    ]
 
+    # get instructions
     instructions : dict = get_instructions()
     if not instructions:
         raise RuntimeError("No instructions found. Please check the configuration.")
     
-    entity_instructions : dict = instructions.get(type.value, [])
-    if not entity_instructions:
-        raise RuntimeError("No entity instructions found. Please check the configuration.")
+    actions : list[Instruction] = [
+        Instruction.model_validate(action)
+        for action in instructions
+        if type.value in action.get("available_for", [])
+    ]
     
-    raw_actions : list = entity_instructions.get("actions", [])
-    if not raw_actions:
-        raise RuntimeError("No entity actions found. Please check the configuration.")
+    # entity_instructions : dict = instructions.get(type.value, [])
+    # if not entity_instructions:
+    #     raise RuntimeError("No entity instructions found. Please check the configuration.")
     
-    actions : list[Instruction] = [Instruction.model_validate(action) for action in raw_actions]
+    # raw_actions : list = entity_instructions.get("actions", [])
+    # if not raw_actions:
+    #     raise RuntimeError("No entity actions found. Please check the configuration.")
     
-    raw_combinators : list = entity_instructions.get("combinators", [])
-    if not raw_combinators:
-        raise RuntimeError("No entity combinators found. Please check the configuration.")
-
-    combinators : list[Combinator] = [Combinator.model_validate(combinator) for combinator in raw_combinators]
+    # actions : list[Instruction] = [Instruction.model_validate(action) for action in raw_actions]
 
     return combinators, actions
 
@@ -274,17 +287,32 @@ def save_entity(
 
     if not save:
         return None
+    
+    while True:
         
-    output_path : str = FilePathPrompt(
-        message="Output file:",
-        default=default,
-        validate=file_extension_validator
-    ).execute()
+        output_path : str = FilePathPrompt(
+            message="Output file:",
+            default=default,
+            validate=file_extension_validator
+        ).execute()
+        path = Path(output_path)
+        
+        if path.exists():
+            overwrite = ListPrompt(
+                message="File already exists. Overwrite?",
+                choices=[
+                    Choice(value=True, name="yes"),
+                    Choice(value=False, name="no")
+                ]
+            ).execute()
 
-    path = Path(output_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
-    return path
+            if not overwrite:
+                print("Please choose another file name.")
+                continue
+            
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        return path
 
 
 def render_section(
@@ -313,10 +341,10 @@ def build_enclave() -> None:
         return
     enclave_text : str = render_section(body, title="enclave")
 
-    ALVIE_CODE_PATH = os.environ["ALVIE_CODE_PATH"]
+    WORKING_PATH = os.environ["WORKING_PATH"]
     output_path : Path | None = save_entity(
         text=enclave_text,
-        default=f"{ALVIE_CODE_PATH}/enclaves/victim.etdl",
+        default=f"{WORKING_PATH}/enclaves/victim.etdl",
         file_extension_validator=FileExtensionValidator.enclave_file_validator()
     )
 
@@ -349,10 +377,10 @@ def build_attacker() -> None:
 
     attacker_text : str = "\n".join(section_texts)
 
-    ALVIE_CODE_PATH = os.environ["ALVIE_CODE_PATH"]
+    WORKING_PATH = os.environ["WORKING_PATH"]
     output_path : Path | None = save_entity(
         text=attacker_text,
-        default=f"{ALVIE_CODE_PATH}/attackers/attacker.atdl",
+        default=f"{WORKING_PATH}/attackers/attacker.atdl",
         file_extension_validator=FileExtensionValidator.attacker_file_validator()
     )
 

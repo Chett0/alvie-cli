@@ -19,7 +19,7 @@ class Combinator(BaseModel):
 class Operand(Enum):
     REGISTER = "reg"
     REGISTER_INDIRECT = "ind"
-    MEMORY_LABEL = "mem"
+    MEMORY_LABEL = "label"
     IMMEDIATE = "imm"
     SECRET = "?"
     IDENT = "ident"
@@ -84,8 +84,9 @@ class Instruction(BaseModel):
     name: str
     description: str
     params: list[Param] = []
-    example: str | None = None
+    examples: list[str] | None = None
     atom : bool = False
+    available_for: list[Entity] = []
 
     def get_num_params(self) -> int:
         return len(self.params)

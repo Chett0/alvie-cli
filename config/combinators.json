@@ -1,0 +1,22 @@
+[
+    {
+        "name" : "sequence ;",
+        "description": ""
+    },
+    {
+        "name" : "choice |",
+        "description": ""
+    },
+    {
+        "name" : "repeat *",
+        "description": ""
+    }, 
+    {
+        "name" : "group (...)",
+        "description": ""
+    },
+    {
+        "name" : "eps",
+        "description": ""
+    }
+]
