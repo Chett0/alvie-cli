@@ -11,10 +11,11 @@ RUN mkdir -p /var/lib/apt/lists/partial && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-RUN python -m venv venv
+RUN python -m venv /home/alvie/venv
 
-ENV PATH="./venv/bin:$PATH"
+ENV PATH="/home/alvie/venv/bin:$PATH"
 ENV ALVIE_CODE_PATH="/home/alvie/alvie/code"
+ENV WORKING_PATH="/home/alvie/alvie-cli"
 
 RUN pip install --upgrade pip && \
     pip install uv

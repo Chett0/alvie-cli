@@ -5,8 +5,9 @@ from InquirerPy.base.control import Choice
 from InquirerPy.prompts.fuzzy import FuzzyPrompt
 
 from pathlib import Path
+import os
 
-from utils import BACK_CHOICE, DONE_CHOICE, HELP_CHOICE, SHOW_CHOICE, get_instructions, is_back, is_done, is_help, is_show
+from utils import BACK_CHOICE, DONE_CHOICE, HELP_CHOICE, SHOW_CHOICE, get_instructions, get_combinators, is_back, is_done, is_help, is_show
 from validators import FileExtensionValidator, ParameterValidator, ChoiceValidator
 from instructions import AttackerSection, Combinator, Entity, Instruction
 
@@ -17,7 +18,7 @@ def print_entity(
     print("\nGenerated entity:\n")
     print(entity)
     if output_path:
-        print(f"Wrote: {output_path}")
+        print(f"Saved in: {output_path}\n")
 
 # A global variable that defines if using description or not?
 def build_choices(
@@ -159,7 +160,7 @@ def build_instructions(
                     message="Choose atom:"
                 )
                 if sub_expr:
-                    sub_expr += f"; {new_sub_expr}"
+                    sub_expr += f";\n {new_sub_expr}"
                 else:
                     sub_expr = new_sub_expr
 
@@ -169,8 +170,12 @@ def build_instructions(
         num_params : int = instr.get_num_params()
 
         if num_params > 0:
-            if instr.example:
-                print(f"Example: {instr.example}\n")
+
+            if instr.examples:
+                print(f"Examples:")
+                for example in instr.examples:
+                    print(f"  - {instr.name} {example}")
+                print()
 
             params = []
 
@@ -203,7 +208,7 @@ def build_combinators(
     expr : str = ""
 
     extra_choices: list[Choice] = []
-    if help:
+    if not help:
         extra_choices.append(HELP_CHOICE)
     extra_choices.extend([SHOW_CHOICE, BACK_CHOICE, DONE_CHOICE])
 
@@ -250,17 +255,17 @@ def build_combinators(
         match action.name:
             case "eps":
                 if expr:
-                    expr += f"; eps"
+                    expr += f";\n eps"
                 else:
                     expr = "eps"
 
             case "sequence ;":
                 sub_expr : str = build_instructions(atoms)
                 if expr:
-                    expr += f"; {sub_expr}"
+                    expr += f";\n {sub_expr}"
                 else:
                     expr = sub_expr
-
+            # TODO: it shows prepare body twice for attacker 
             case "choice |":
                 if not expr:
                     left_sub_expr : str = build_combinators(
@@ -293,7 +298,7 @@ def build_combinators(
                 )
                 if sub_expr:
                     if expr:
-                        expr += f"; ({sub_expr})"
+                        expr += f";\n ({sub_expr})"
                     else:
                         expr = f"({sub_expr})"
 
@@ -305,32 +310,43 @@ def build_combinators(
 def get_combinators_actions(
         type : Entity
     ) -> tuple[list[Combinator], list[Instruction]]:
+    
+    # get combinators
+    raw_combinators : list = get_combinators()
+    if not raw_combinators:
+        raise RuntimeError("No entity combinators found. Please check the configuration.")
+    combinators : list[Combinator] = [
+        Combinator.model_validate(combinator) 
+        for combinator in raw_combinators
+    ]
 
+    # get instructions
     instructions : dict = get_instructions()
     if not instructions:
         raise RuntimeError("No instructions found. Please check the configuration.")
     
-    entity_instructions : dict = instructions.get(type.value, [])
-    if not entity_instructions:
-        raise RuntimeError("No entity instructions found. Please check the configuration.")
+    actions : list[Instruction] = [
+        Instruction.model_validate(action)
+        for action in instructions
+        if type.value in action.get("available_for", [])
+    ]
     
-    raw_actions : list = entity_instructions.get("actions", [])
-    if not raw_actions:
-        raise RuntimeError("No entity actions found. Please check the configuration.")
+    # entity_instructions : dict = instructions.get(type.value, [])
+    # if not entity_instructions:
+    #     raise RuntimeError("No entity instructions found. Please check the configuration.")
     
-    actions : list[Instruction] = [Instruction.model_validate(action) for action in raw_actions]
+    # raw_actions : list = entity_instructions.get("actions", [])
+    # if not raw_actions:
+    #     raise RuntimeError("No entity actions found. Please check the configuration.")
     
-    raw_combinators : list = entity_instructions.get("combinators", [])
-    if not raw_combinators:
-        raise RuntimeError("No entity combinators found. Please check the configuration.")
-
-    combinators : list[Combinator] = [Combinator.model_validate(combinator) for combinator in raw_combinators]
+    # actions : list[Instruction] = [Instruction.model_validate(action) for action in raw_actions]
 
     return combinators, actions
 
 
 def save_entity(
         text : str,
+        default: str,
         file_extension_validator : FileExtensionValidator,
 ) -> Path | None: 
     
@@ -345,15 +361,31 @@ def save_entity(
     if not save:
         return None
     
-    output_path : str = FilePathPrompt(
-        message="Output file:",
-        default="enclaves/victim.etdl",
-        validate=file_extension_validator
-    ).execute()
+    while True:
+        
+        output_path : str = FilePathPrompt(
+            message="Output file:",
+            default=default,
+            validate=file_extension_validator
+        ).execute()
+        path = Path(output_path)
+        
+        if path.exists():
+            overwrite = ListPrompt(
+                message="File already exists. Overwrite?",
+                choices=[
+                    Choice(value=True, name="yes"),
+                    Choice(value=False, name="no")
+                ]
+            ).execute()
 
-    path = Path(output_path)
-    path.write_text(text, encoding="utf-8")
-    return path
+            if not overwrite:
+                print("Please choose another file name.")
+                continue
+            
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        return path
 
 
 def render_section(
@@ -368,8 +400,6 @@ def render_section(
 
 def build_enclave() -> None:
 
-    # TODO define enclave instructions in json config
-
     print("Victim enclave builder\n")
 
     combinators, actions = get_combinators_actions(type=Entity.ENCLAVE)
@@ -382,8 +412,10 @@ def build_enclave() -> None:
         return
     enclave_text : str = render_section(body, title="enclave")
 
+    WORKING_PATH = os.environ["WORKING_PATH"]
     output_path : Path | None = save_entity(
         text=enclave_text,
+        default=f"{WORKING_PATH}/enclaves/victim.etdl",
         file_extension_validator=FileExtensionValidator.enclave_file_validator()
     )
 
@@ -394,10 +426,7 @@ def build_enclave() -> None:
 
 
 def build_attacker() -> None:
-
-    # TODO define attacker instructions in json config
-    # TODO maybe split atoms and combinators in json config because they are the same for enclave and attacker?
-
+    
     print("Attacker builder\n")
 
     combinators, actions = get_combinators_actions(type=Entity.ATTACKER)
@@ -416,8 +445,10 @@ def build_attacker() -> None:
 
     attacker_text : str = "\n".join(section_texts)
 
+    WORKING_PATH = os.environ["WORKING_PATH"]
     output_path : Path | None = save_entity(
         text=attacker_text,
+        default=f"{WORKING_PATH}/attackers/attacker.atdl",
         file_extension_validator=FileExtensionValidator.attacker_file_validator()
     )
 
