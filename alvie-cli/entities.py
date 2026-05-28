@@ -192,7 +192,7 @@ def build_combinators(
                     expr += f";\n {sub_expr}"
                 else:
                     expr = sub_expr
-
+            # TODO: it shows prepare body twice for attacker 
             case "choice |":
                 if not expr:
                     left_sub_expr : str = build_combinators(
