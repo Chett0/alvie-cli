@@ -59,3 +59,9 @@ def get_instructions():
     instructions_path = Path(__file__).resolve().parent.parent / "config" / "instructions.json"
     with instructions_path.open("r") as file:
         return json.load(file)
+    
+def get_combinators():
+    
+    combinators_path = Path(__file__).resolve().parent.parent / "config" / "combinators.json"
+    with combinators_path.open("r") as file:
+        return json.load(file)

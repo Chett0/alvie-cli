@@ -109,7 +109,7 @@ def build_instructions(
                     message="Choose atom:"
                 )
                 if sub_expr:
-                    sub_expr += f"; {new_sub_expr}"
+                    sub_expr += f";\n {new_sub_expr}"
                 else:
                     sub_expr = new_sub_expr
 
@@ -179,7 +179,7 @@ def build_combinators(
         match action:
             case "eps":
                 if expr:
-                    expr += f"; eps"
+                    expr += f";\n eps"
                 else:
                     expr = "eps"
             
@@ -189,7 +189,7 @@ def build_combinators(
             case "sequence ;":
                 sub_expr : str = build_instructions(atoms)
                 if expr:
-                    expr += f"; {sub_expr}"
+                    expr += f";\n {sub_expr}"
                 else:
                     expr = sub_expr
 
@@ -225,7 +225,7 @@ def build_combinators(
                 )
                 if sub_expr:
                     if expr:
-                        expr += f"; ({sub_expr})"
+                        expr += f";\n ({sub_expr})"
                     else:
                         expr = f"({sub_expr})"
 
@@ -327,8 +327,6 @@ def render_section(
 
 def build_enclave() -> None:
 
-    # TODO define enclave instructions in json config
-
     print("Victim enclave builder\n")
 
     combinators, actions = get_combinators_actions(type=Entity.ENCLAVE)
@@ -355,10 +353,7 @@ def build_enclave() -> None:
 
 
 def build_attacker() -> None:
-
-    # TODO define attacker instructions in json config
-    # TODO maybe split atoms and combinators in json config because they are the same for enclave and attacker?
-
+    
     print("Attacker builder\n")
 
     combinators, actions = get_combinators_actions(type=Entity.ATTACKER)

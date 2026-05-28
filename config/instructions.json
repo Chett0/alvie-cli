@@ -16,15 +16,21 @@
     {
         "name" : "mov",
         "description": "Move data from source to destination", 
-        "params" : [{ "operands" : ["reg"] }, { "operands" : ["reg", "imm"] }],
-        "examples": ["r1, r2", "r1, #5"],
+        "params" : [
+            { "operands" : ["reg", "deref", "label_addr", "reg_addr", "imm", "?"] }, 
+            { "operands" : ["reg", "label_addr", "reg_addr"] }
+        ],
+        "examples": ["r1, r2", "r1, #5", "@r1, r2", "#42, &data_s"],
         "atom" : true,
         "available_for": ["enclave", "attacker"]
     },
     {
         "name" : "add",
         "description": "Sum two operands",
-        "params" : [{ "operands" : ["reg"] }, { "operands" : ["reg", "imm"] }],
+        "params" : [
+            { "operands" : ["reg", "deref", "label_addr", "reg_addr", "imm", "?"] },
+            { "operands" : ["reg", "label_addr", "reg_addr"] }
+        ],
         "examples" : ["r1, r2", "r1, #5"],
         "atom" : true,
         "available_for": ["enclave", "attacker"]
@@ -32,7 +38,10 @@
     {
         "name" : "cmp",
         "description": "Compare two operands",
-        "params" : [{ "operands" : ["reg", "?"] }, { "operands" : ["reg", "imm"] }],
+        "params" : [
+            { "operands" : ["reg", "deref", "label_addr", "reg_addr", "imm", "?"] },
+            { "operands" : ["reg", "deref", "label_addr", "reg_addr", "imm", "?"] }
+        ],
         "examples" : ["r1, r2", "r1, #5"],
         "atom" : true,
         "available_for": ["enclave", "attacker"]
@@ -40,15 +49,29 @@
     {
         "name" : "jmp",
         "description": "Jump to label",
-        "params" : [{ "operands" : ["label"] }],
-        "examples" : ["label1"],
+        "params" : [
+            { "operands" : ["label", "imm", "reg", "deref", "label_addr", "reg_addr"] }
+        ],
+        "examples" : ["label1", "#enc_e", "&r12"],
         "atom" : true,
         "available_for": ["enclave", "attacker"]
     },
     {
+        "name" : "jin",
+        "description": "Jump if not zero",
+        "params" : [
+            { "operands" : ["label", "imm", "reg", "deref", "label_addr", "reg_addr"] }
+        ],
+        "examples" : ["label1"],
+        "atom" : true,
+        "available_for": ["attacker"]
+    },
+    {
         "name" : "push",
-        "description": "Push to stack",
-        "params" : [{ "operands" : ["reg", "imm"] }],
+        "description": "Push into stack",
+        "params" : [
+            { "operands" : ["reg", "deref", "label_addr", "reg_addr", "imm", "?"] }
+        ],
         "examples" : ["r1, #5"],
         "atom" : true,
         "available_for": ["enclave", "attacker"]
@@ -70,9 +93,64 @@
     {
         "name" : "ubr",
         "description" : "Unconditional branch",
-        "params" : [{ "operands" : ["label"] }],
+        "params" : [
+            { "operands" : ["label"] }
+        ],
         "examples" : ["label1"],
         "atom" : true,
+        "available_for": ["enclave", "attacker"]
+    },
+    {
+        "name" : "create",
+        "description" : "",
+        "params" : [
+            { "operands" : ["ident"] },
+            { "operands" : ["ident"] },
+            { "operands" : ["ident"] },
+            { "operands" : ["ident"] }
+        ],
+        "atom" : true,
+        "examples" : [],
         "available_for": ["attacker"]
+    },
+    {
+        "name" : "timer_enable",
+        "description" : "",
+        "params" : [
+            { "operands" : ["int"] }
+        ],
+        "atom" : true,
+        "examples" : [],
+        "available_for": ["attacker"]
+    },
+    {
+        "name" : "start_counting",
+        "description" : "",
+        "params" : [
+            { "operands" : ["int"] }
+        ],
+        "atom" : true,
+        "examples" : [],
+        "available_for": ["attacker"]
+    },
+    {
+        "name" : "reti",
+        "description" : "",
+        "params" : [],
+        "atom" : true,
+        "examples" : [],
+        "available_for": ["attacker"]
+    },
+    {
+        "name" : "ifz",
+        "description" : "",
+        "atom" : false,
+        "available_for": ["enclave", "attacker"]
+    },
+    {
+        "name" : "balanced_ifz",
+        "description" : "",
+        "atom" : false,
+        "available_for": ["enclave"]
     }
 ]
