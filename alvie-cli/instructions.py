@@ -2,12 +2,19 @@ from enum import Enum
 import re
 from pydantic import BaseModel
 
-from InquirerPy.base.control import Choice
-
 class Entity(Enum):
     ENCLAVE     = "enclave"
     ATTACKER    = "attacker"
 
+    def build(self):
+        # TODO Refactor to resolve circular import 
+        from entities import build_enclave, build_attacker
+        if self == Entity.ENCLAVE:
+            build_enclave()
+        elif self == Entity.ATTACKER:
+            build_attacker()
+        else:
+            raise RuntimeError(f"Unknown entity type: {self.value}")
 
 class AttackerSection(Enum):
     ISR = "isr"

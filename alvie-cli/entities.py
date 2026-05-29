@@ -7,9 +7,11 @@ from InquirerPy.prompts.fuzzy import FuzzyPrompt
 from pathlib import Path
 import os
 
-from utils import BACK_CHOICE, DONE_CHOICE, HELP_CHOICE, SHOW_CHOICE, get_instructions, get_combinators, is_back, is_done, is_help, is_show
+from utils import BACK_CHOICE, DONE_CHOICE, HELP_CHOICE, SHOW_CHOICE, is_back, is_done, is_help, is_show, load_combinators, load_instructions
 from validators import FileExtensionValidator, ParameterValidator, ChoiceValidator
 from instructions import AttackerSection, Combinator, Entity, Instruction
+
+from commands import Command
 
 def print_entity(
         entity: str, 
@@ -21,8 +23,9 @@ def print_entity(
         print(f"Saved in: {output_path}\n")
 
 # A global variable that defines if using description or not?
+# TODO refactor with a superclass BaseChoice
 def build_choices(
-        items : list[Combinator] | list[Instruction],
+        items : list[Combinator] | list[Instruction] | list[Command],
         extra_choices : list[Choice] = [],
         include_desc : bool = False
     ) -> list[Choice]:
@@ -312,7 +315,7 @@ def get_combinators_actions(
     ) -> tuple[list[Combinator], list[Instruction]]:
     
     # get combinators
-    raw_combinators : list = get_combinators()
+    raw_combinators : list = load_combinators()
     if not raw_combinators:
         raise RuntimeError("No entity combinators found. Please check the configuration.")
     combinators : list[Combinator] = [
@@ -321,7 +324,7 @@ def get_combinators_actions(
     ]
 
     # get instructions
-    instructions : dict = get_instructions()
+    instructions : dict = load_instructions()
     if not instructions:
         raise RuntimeError("No instructions found. Please check the configuration.")
     

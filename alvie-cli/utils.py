@@ -56,19 +56,19 @@ def run_alvie(
     print()
     subprocess.run([exe, *args], cwd=alvie_path, check=True)
 
-def get_commands():
+def load_commands():
 
     commands_path = Path(__file__).resolve().parent.parent / "config" / "commands.json"
     with commands_path.open("r") as file:
         return json.load(file)
 
-def get_instructions():
+def load_instructions():
 
     instructions_path = Path(__file__).resolve().parent.parent / "config" / "instructions.json"
     with instructions_path.open("r") as file:
         return json.load(file)
     
-def get_combinators():
+def load_combinators():
     
     combinators_path = Path(__file__).resolve().parent.parent / "config" / "combinators.json"
     with combinators_path.open("r") as file:
