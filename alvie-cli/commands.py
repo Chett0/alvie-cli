@@ -17,7 +17,7 @@ class InputType(Enum):
     INT = "int"
 
 class Validation(BaseModel):
-    must_exist: bool = True
+    must_exists: bool = True
 
 class Argument(BaseModel):
     description: str
@@ -36,7 +36,7 @@ class Argument(BaseModel):
             if self.extension and not self.extension.startswith("."):
                 self.extension = f".{self.extension}"
             
-            must_exists = self.validation.must_exist if self.validation else True
+            must_exists = self.validation.must_exists if self.validation else True
 
             file : str = FilePathPrompt(
                 message=message,
@@ -50,7 +50,7 @@ class Argument(BaseModel):
             return file
         
         if self.type == InputType.DIRECTORY:
-            must_exists = self.validation.must_exist if self.validation else True
+            must_exists = self.validation.must_exists if self.validation else True
 
             directory : str = FilePathPrompt(
                 message=message,

@@ -55,7 +55,7 @@ def build_instructions(
         instructions : list[Instruction],
         message = "Choose instruction:",
         help=False
-    ) -> str:
+) -> str:
 
     expr : str = ""
 
@@ -204,9 +204,9 @@ def build_instructions(
 def build_combinators(
         combinators : list[Combinator],
         atoms : list[Instruction],
-        section: str = "enclave",
+        message: str,
         help=False
-    ) -> str:
+) -> str:
 
     expr : str = ""
 
@@ -223,7 +223,7 @@ def build_combinators(
 
     while True:
         action = FuzzyPrompt(
-            message=f"Build {section} body",
+            message=message,
             choices= choices,
             max_height="70%",
             validate=ChoiceValidator(choices=choices),
@@ -240,7 +240,7 @@ def build_combinators(
             sub_expr = build_combinators(
                 combinators=combinators,
                 atoms=atoms,
-                section=section,
+                message=message,
                 help=True
             )
 
@@ -267,8 +267,8 @@ def build_combinators(
                 if expr:
                     expr += f";\n {sub_expr}"
                 else:
-                    expr = sub_expr
-            # TODO: it shows prepare body twice for attacker 
+                    expr = sub_expr 
+                    
             case "choice |":
                 if not expr:
                     left_sub_expr : str = build_combinators(
@@ -312,7 +312,7 @@ def build_combinators(
 
 def get_combinators_actions(
         type : Entity
-    ) -> tuple[list[Combinator], list[Instruction]]:
+) -> tuple[list[Combinator], list[Instruction]]:
     
     # get combinators
     raw_combinators : list = load_combinators()
@@ -409,7 +409,8 @@ def build_enclave() -> None:
     
     body : str = build_combinators(
         combinators=combinators,
-        atoms=actions
+        atoms=actions,
+        message="Build enclave body"
     )
     if not body:
         return
@@ -439,7 +440,7 @@ def build_attacker() -> None:
         section_body : str = build_combinators(
             combinators=combinators,
             atoms=actions,
-            section=section.value
+            message=f"Build {section.value} body"
         )
         if not section_body:
             return
