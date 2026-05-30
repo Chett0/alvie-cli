@@ -21,35 +21,18 @@ def get_commands() -> list[Command]:
 
 def choose_args(command: Command) -> tuple[bool, list[str]]:
 
-    args : list[str] = []
-    required_args : list[Argument] = []
-    optional_args : list[Argument] = []
-    for arg in command.args:
-        if arg.required:
-            required_args.append(arg)
-        else:
-            optional_args.append(arg)
+    chosen_args : list[str] = []
+    
+    required_args : list[Argument] = [arg for arg in command.args if arg.required]
+    optional_args : list[Argument] = [arg for arg in command.args if not arg.required]
 
-    for arg in required_args:
-        value = arg.select_value()
-        args.extend([f"{arg.flag}", value])
-
-    if not optional_args:
-        arg = ListPrompt(
-            message="Do you want to execute?",
-            choices=[DONE_CHOICE, BACK_CHOICE]
-        ).execute()
-
-        if is_done(arg):
-            return True, args
-        else:
-            return False, []
-        
+    for arg in required_args: collect_arg(arg, chosen_args)
+    
     while optional_args:
         optional_choices : list[Choice] = [Choice(value=arg, name=arg.description) for arg in optional_args]
-        arg = ListPrompt(
+        arg: Argument = ListPrompt(
             message="Do you want to provide optional arguments?",
-            choices=optional_choices + [BACK_CHOICE, DONE_CHOICE]
+            choices= optional_choices + [BACK_CHOICE, DONE_CHOICE]
         ).execute()
 
         if is_done(arg):
@@ -57,13 +40,18 @@ def choose_args(command: Command) -> tuple[bool, list[str]]:
         if is_back(arg):
             return False, []
         else:
-            value = arg.select_value()
-            args.extend([f"{arg['flag']}", value])
+            collect_arg(arg, chosen_args)
             optional_args.remove(arg)
-
-    args.extend(["--secret", "0"])
     
-    return True, args
+    return True, chosen_args
+
+def collect_arg(arg: Argument, args: list[str]):
+    value = arg.select_value()
+    if isinstance(value, bool):
+        if value:
+            args.extend([f"{arg.flag}"])
+    else: 
+        args.extend([f"{arg.flag}", value])
 
 def execute() -> None:
     try:

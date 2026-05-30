@@ -84,7 +84,7 @@ class Argument(BaseModel):
                 ]
             ).execute()
 
-            return selected_boolean
+            return bool(selected_boolean)
         
         if self.type == InputType.INT:
             selected_int : str = InputPrompt(
