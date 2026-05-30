@@ -81,7 +81,14 @@ def run_alvie(
                 input_symbols=input_symbols,
                 output_symbols=output_symbols,
             )
-            print(hypothesis)            
+            print(hypothesis)  
+
+    print("Recap\n")
+    for symbol, data in output_symbols.items():
+        count = data.get("count", 0)
+        print(f"\t{data['description']} {symbol}: {count}") 
+
+    print("\n")        
             
     
 def parse_hypothesis(
@@ -107,8 +114,10 @@ def parse_hypothesis(
                 
                 if match: 
                     input, output = match.groups()
-                    res += f"\t{input_symbols[input]['description']} ({input}) -> {output_symbols[output]['description']} ({output})\n\n"
-                    
+                    input_symbol, output_symbol = input_symbols[input], output_symbols[output]
+                    output_symbol["count"] = output_symbol.get("count", 0) + 1
+                    res += f"\t{input_symbol['description']} ({input}) -> {output_symbol['description']} ({output})\n\n"
+
     res += "\n\n"
     return res
 
