@@ -3,6 +3,8 @@ from pathlib import Path
 import subprocess
 import json
 from dotenv import load_dotenv
+import re
+from strip_ansi import strip_ansi
 
 from InquirerPy.base.control import Choice
 
@@ -54,7 +56,52 @@ def run_alvie(
     for i in range(len(args)//2):
         print(f"{args[2*i]}: {args[2*i+1]}")
     print()
-    subprocess.run([exe, *args], cwd=alvie_path, check=True)
+    # subprocess.run([exe, *args], cwd=alvie_path, check=True)
+    
+    process = subprocess.run(
+        [exe, *args],
+        cwd=alvie_path,
+        capture_output=True,
+        text=True,
+        check=True
+    )
+    
+    res = strip_ansi(process.stdout)
+    
+    hypothesis = res.split("\n")
+    
+    for i, line in enumerate(hypothesis):
+        raw_line = line.strip()
+        if raw_line:
+            hypothesis = parse_hypothesis(raw_line, i)
+            print(hypothesis)            
+            
+    
+def parse_hypothesis(raw_hypothesis: str, i):
+    
+    res = f"Hypothesis {i+1}:\n\n"
+    
+    raw_runs = raw_hypothesis.split(".")
+        
+    raw_symbols = load_output_symbols()
+    symbols = raw_symbols["inputs"] | raw_symbols["outputs"]
+    
+    for j, raw_run in enumerate(raw_runs):
+        if raw_run:
+            res += f"Run {j+1}:\n\n"
+            
+            steps = re.findall(r'\[(.*?)\]', raw_run)
+            
+            for step in steps:
+                # Groups: [input output]
+                match = re.match(r"^([A-Z_=]+)(.*)$", step)
+                
+                if match: 
+                    input, output = match.groups()
+                    res += f"\t{symbols[input]['description']} ({input}) -> {symbols[output]['description']} ({output})\n\n"
+    
+    res += "\n\n"
+    return res
 
 def load_commands():
 
@@ -72,4 +119,10 @@ def load_combinators():
     
     combinators_path = Path(__file__).resolve().parent.parent / "config" / "combinators.json"
     with combinators_path.open("r") as file:
+        return json.load(file)
+    
+def load_output_symbols():
+    
+    output_symbols_path = Path(__file__).resolve().parent.parent / "config" / "output_symbols.json"
+    with output_symbols_path.open("r") as file:
         return json.load(file)

@@ -1,0 +1,90 @@
+{
+    "inputs": {
+        "_": {
+            "description": "No input",
+            "color": "yellow"
+        },
+        "I": {
+            "description": "JmpIn (attacker jumps into enclave)",
+            "color": "blue"
+        },
+        "C": {
+            "description": "CreateEncl",
+            "color": "blue"
+        },
+        "SC": {
+            "description": "StartCounting",
+            "color": "blue"
+        },
+        "T": {
+            "description": "TimerEnable",
+            "color": "blue"
+        },
+        "=": {
+            "description": "CMP instruction",
+            "color": "blue/green"
+        },
+        "U": {
+            "description": "Ubr (enclave unconditional branch / exit)",
+            "color": "green"
+        },
+        "R": {
+            "description": "Reti",
+            "color": "magenta"
+        }
+    },
+    "outputs": {
+        "†": {
+            "description": "Illegal (step rejected)",
+            "color": "yellow"
+        },
+        "?": {
+            "description": "Unsupported",
+            "color": "yellow"
+        },
+        "•": {
+            "description": "Reset",
+            "color": "red"
+        },
+        "∞": {
+            "description": "Diverge (infinite loop)",
+            "color": "red"
+        },
+        "i": {
+            "description": "JmpIn observed",
+            "color": "blue"
+        },
+        "s": {
+            "description": "Silent",
+            "color": "blue"
+        },
+        "t": {
+            "description": "Timed observation (normal step)",
+            "color": "green"
+        },
+        "o": {
+            "description": "JmpOut (enclave exited)",
+            "color": "green"
+        },
+        "r": {
+            "description": "Reti observed",
+            "color": "magenta"
+        },
+        "th": {
+            "description": "Timed + interrupt handled",
+            "color": "magenta"
+        },
+        "oh": {
+            "description": "JmpOut + interrupt handled",
+            "color": "magenta"
+        },
+        "ti": {
+            "description": "Timed + JmpIn observed",
+            "color": "blue"
+        },
+        "to": {
+            "description": "Timed + JmpOut",
+            "color": "green"
+        }
+    }
+}
