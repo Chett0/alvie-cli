@@ -66,25 +66,34 @@ def run_alvie(
         check=True
     )
     
-    res = strip_ansi(process.stdout)
+    # TODO define the actor using the color
+    res : str = strip_ansi(process.stdout)
+    hypotheses : list[str] = res.split("\n")
+    raw_symbols : dict = load_output_symbols()
+    input_symbols, output_symbols = raw_symbols["inputs"], raw_symbols["outputs"]
     
-    hypothesis = res.split("\n")
-    
-    for i, line in enumerate(hypothesis):
-        raw_line = line.strip()
-        if raw_line:
-            hypothesis = parse_hypothesis(raw_line, i)
+    for i, line in enumerate(hypotheses):
+        raw_hypothesis = line.strip()
+        if raw_hypothesis:
+            hypothesis = parse_hypothesis(
+                raw_hypothesis=raw_hypothesis, 
+                i=i, 
+                input_symbols=input_symbols,
+                output_symbols=output_symbols,
+            )
             print(hypothesis)            
             
     
-def parse_hypothesis(raw_hypothesis: str, i):
+def parse_hypothesis(
+        raw_hypothesis: str, 
+        i : int,
+        input_symbols: dict,
+        output_symbols: dict
+) -> str:
     
     res = f"Hypothesis {i+1}:\n\n"
     
-    raw_runs = raw_hypothesis.split(".")
-        
-    raw_symbols = load_output_symbols()
-    symbols = raw_symbols["inputs"] | raw_symbols["outputs"]
+    raw_runs : list[str] = raw_hypothesis.split(".")
     
     for j, raw_run in enumerate(raw_runs):
         if raw_run:
@@ -98,8 +107,8 @@ def parse_hypothesis(raw_hypothesis: str, i):
                 
                 if match: 
                     input, output = match.groups()
-                    res += f"\t{symbols[input]['description']} ({input}) -> {symbols[output]['description']} ({output})\n\n"
-    
+                    res += f"\t{input_symbols[input]['description']} ({input}) -> {output_symbols[output]['description']} ({output})\n\n"
+                    
     res += "\n\n"
     return res
 
