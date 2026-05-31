@@ -1,9 +1,11 @@
 from commands import Command, Argument
-from utils import BACK_CHOICE, DONE_CHOICE, get_alvie_code_path, is_back, is_done, load_commands, run_alvie
+from utils import BACK_CHOICE, DONE_CHOICE, get_alvie_code_path, is_back, is_done, load_commands
+from output import run_alvie
 
 from InquirerPy.prompts.fuzzy import FuzzyPrompt
 from InquirerPy.base.control import Choice
 from InquirerPy.prompts.list import ListPrompt
+from InquirerPy.prompts.confirm import ConfirmPrompt
 
 from entities import build_choices
 
@@ -78,7 +80,16 @@ def execute() -> None:
         
         execute, args = choose_args(action)
         if execute:
-            run_alvie(alvie_path, "learn", args)
-            return
+            std_output: bool = ConfirmPrompt(
+                message="Do you want to see the standard output of the command?",
+                default=True,
+            ).execute()
+
+            run_alvie(
+                alvie_path=alvie_path, 
+                executable_name="learn", 
+                args=args,
+                std_output=std_output
+            )
 
     
