@@ -20,7 +20,7 @@
             { "operands" : ["reg", "deref", "label_addr", "reg_addr", "imm", "?"] }, 
             { "operands" : ["reg", "label_addr", "reg_addr"] }
         ],
-        "examples": ["r1, r2", "r1, #5", "@r1, r2", "#42, &data_s"],
+        "examples": ["r1, r2", "#5, r1", "@r1, r2", "#42, &data_s"],
         "atom" : true,
         "available_for": ["enclave", "attacker"]
     },
