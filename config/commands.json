@@ -2,7 +2,7 @@
     {
         "name" : "Learn",
         "description" : "Learn a Mealy machine model",
-        "file" : "learn.exe",
+        "executable" : "learn.exe",
         "args" : [
             {
                 "description": "Path to attacker specification (.atdl file)",
@@ -95,6 +95,6 @@
     {
         "name" : "Fa",
         "description" : "Find flow-analysis (NI) violations between two models",
-        "file" : "fa.exe"
+        "executable" : "fa.exe"
     }
 ]

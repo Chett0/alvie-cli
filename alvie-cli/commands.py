@@ -1,6 +1,8 @@
-from ast import arg
 from enum import Enum
-from pydantic import BaseModel
+from unittest import case
+from typing_extensions import Self
+from pydantic import BaseModel, Field, PrivateAttr, model_validator
+from prompt_toolkit.validation import Validator
 
 from InquirerPy.prompts.input import InputPrompt
 from InquirerPy.prompts.filepath import FilePathPrompt
@@ -29,77 +31,89 @@ class Argument(BaseModel):
     default: str | None = None
     required: bool = False
 
-    def select_value(self) -> str:
-        message : str = f"{self.description} {'(required)' if self.required else '(optional)'}:"
-        
-        if self.type == InputType.FILENAME:
-            if self.extension and not self.extension.startswith("."):
-                self.extension = f".{self.extension}"
-            
-            must_exists = self.validation.must_exists if self.validation else True
+    _validator: Validator | None = PrivateAttr(default=None)
 
-            file : str = FilePathPrompt(
-                message=message,
-                default=self.default,
-                validate=FileExtensionValidator(
+    @model_validator(mode="after")
+    def populate_validator(self) -> Self:
+
+        match self.type:
+            case InputType.FILENAME:
+                if self.extension and not self.extension.startswith("."):
+                    self.extension = f".{self.extension}"
+                
+                must_exists = self.validation.must_exists if self.validation else True
+                self._validator = FileExtensionValidator(
                     expected_extension=self.extension,
                     must_exists=must_exists
                 )
-            ).execute()
-
-            return file
-        
-        if self.type == InputType.DIRECTORY:
-            must_exists = self.validation.must_exists if self.validation else True
-
-            directory : str = FilePathPrompt(
-                message=message,
-                default=self.default,
-                validate=DirectoryValidator(
+            case InputType.DIRECTORY:
+                must_exists = self.validation.must_exists if self.validation else True
+                self._validator = DirectoryValidator(
                     must_exists=must_exists
                 )
-            ).execute()
 
-            return directory
+            case InputType.INT:
+                self._validator = IntValidator()
+
+        return self
+
+    def select_value(self) -> str:
+        message : str = f"{self.description} {'(required)' if self.required else '(optional)'}:"
         
-        if self.type == InputType.CHOICE:
-            if not self.values:
-                raise ValueError(f"Argument {self.flag} is of type choice but no values were provided.")
-            
-            choices = [Choice(value=value, name=value) for value in self.values]
+        match self.type:
+            case InputType.FILENAME | InputType.DIRECTORY:
+                path : str = FilePathPrompt(
+                    message=message,
+                    default=self.default,
+                    validate=self._validator
+                ).execute()
 
-            selected_choice : str = ListPrompt(
-                message=message,
-                choices=choices
-            ).execute()
-
-            return selected_choice
+                return path
         
-        if self.type == InputType.BOOLEAN:
-            selected_boolean : str = ListPrompt(
-                message=message,
-                choices=[
-                    Choice(value="true", name="Yes"), 
-                    Choice(value="false", name="No")
-                ]
-            ).execute()
+            case InputType.CHOICE:
+                if not self.values:
+                    raise ValueError(f"Argument {self.flag} is of type choice but no values were provided.")
+                
+                choices = [Choice(value=value, name=value) for value in self.values]
 
-            return bool(selected_boolean)
-        
-        if self.type == InputType.INT:
-            selected_int : str = InputPrompt(
-                message=message,
-                default=self.default,
-                validate=IntValidator()
-            ).execute()
+                selected_choice : str = ListPrompt(
+                    message=message,
+                    choices=choices
+                ).execute()
 
-            return selected_int
+                return selected_choice
         
-        else:
-            raise ValueError(f"Argument {self.flag} has unknown type {self.type}.")
+            case InputType.BOOLEAN:
+                selected_boolean : str = ListPrompt(
+                    message=message,
+                    choices=[
+                        Choice(value="true", name="Yes"), 
+                        Choice(value="false", name="No")
+                    ]
+                ).execute()
+
+                return bool(selected_boolean)
+        
+            case InputType.INT:
+                selected_int : str = InputPrompt(
+                    message=message,
+                    default=self.default,
+                    validate=self._validator
+                ).execute()
+
+                return selected_int
+        
+            case _:
+                raise ValueError(f"Argument {self.flag} has unknown type {self.type}.")
 
 class Command(BaseModel):
     name: str
     description: str
-    file: str
-    args: list[Argument] = []
+    executable: str
+    args: list[Argument] = Field(default_factory=list)
+        
+
+class ConfigCommand(BaseModel):
+    name: str
+    executable: str
+    args : list[str]

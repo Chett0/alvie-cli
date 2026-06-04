@@ -42,7 +42,7 @@ def run_alvie(
     #                 check=True
     #                 )
     
-    exe = f"{alvie_path}/_build/default/bin/{executable_name}.exe"
+    exe = f"{alvie_path}/_build/default/bin/{executable_name}"
     print(f"\nRunning {exe} with arguments")
     for i in range(len(args)//2):
         print(f"\t{args[2*i]}: {args[2*i+1]}")
@@ -54,6 +54,7 @@ def run_alvie(
             cwd=alvie_path, 
             check=True
         )
+        print("\n\n")
     else:
         process = subprocess.run(
             [exe, *args],
