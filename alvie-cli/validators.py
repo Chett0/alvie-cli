@@ -1,8 +1,9 @@
 from pathlib import Path
 
-from prompt_toolkit.validation import Validator, ValidationError
-from prompt_toolkit.document import Document
+from InquirerPy.separator import Separator
 from InquirerPy.base.control import Choice
+from prompt_toolkit.document import Document
+from prompt_toolkit.validation import Validator, ValidationError
 
 from instructions import Operand
 
@@ -87,7 +88,11 @@ class ParameterValidator(Validator):
 class ChoiceValidator(Validator):
 
     def __init__(self, choices: list[Choice]):
-        self.choices_values = [choice.value for choice in choices]
+        self.choices_values = [
+            choice.value 
+            for choice in choices
+            if not isinstance(choice, Separator) # ignore separators
+        ]
 
     def validate(self, document: Document) -> None:
         if document.text not in self.choices_values:

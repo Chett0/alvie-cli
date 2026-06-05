@@ -1,16 +1,16 @@
 import os
-from pathlib import Path
 import json
+from pathlib import Path
 from dotenv import load_dotenv
 
 from InquirerPy.base.control import Choice
 
 load_dotenv()
 
-DONE_CHOICE : Choice = Choice(value="Done", name="done")
-BACK_CHOICE : Choice = Choice(value="Back", name="back")
-HELP_CHOICE : Choice = Choice(value="Help", name="help")
-SHOW_CHOICE : Choice = Choice(value="Show", name="show")
+DONE_CHOICE : Choice = Choice(value="Done", name="[✓] Done")
+BACK_CHOICE : Choice = Choice(value="Back", name="[←] Back")
+HELP_CHOICE : Choice = Choice(value="Help", name="[?] Help")
+SHOW_CHOICE : Choice = Choice(value="Show", name="[~] Show")
 
 def is_done(value) -> bool:
     return value == DONE_CHOICE.value

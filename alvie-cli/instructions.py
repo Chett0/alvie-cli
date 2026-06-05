@@ -1,5 +1,5 @@
-from enum import Enum
 import re
+from enum import Enum
 from pydantic import BaseModel
 
 class Entity(Enum):
@@ -140,12 +140,14 @@ DEST_OPERANDS = {
     Operand.LABEL_ADDRESS
 }
 
+class BaseChoice(BaseModel):
+    name: str
+    description: str
+
 class Param(BaseModel):
     operands: list[Operand] = []
 
-class Instruction(BaseModel):
-    name: str
-    description: str
+class Instruction(BaseChoice):
     params: list[Param] = []
     examples: list[str] | None = None
     atom : bool = False
@@ -154,6 +156,5 @@ class Instruction(BaseModel):
     def get_num_params(self) -> int:
         return len(self.params)
 
-class Combinator(BaseModel):
-    name: str
-    description: str
+class Combinator(BaseChoice):
+    pass

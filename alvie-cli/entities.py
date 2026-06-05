@@ -1,17 +1,15 @@
-from InquirerPy.prompts.input import InputPrompt
-from InquirerPy.prompts.filepath import FilePathPrompt
-from InquirerPy.prompts.list import ListPrompt
 from InquirerPy.base.control import Choice
+from InquirerPy.prompts.list import ListPrompt
+from InquirerPy.prompts.input import InputPrompt
 from InquirerPy.prompts.fuzzy import FuzzyPrompt
+from InquirerPy.prompts.filepath import FilePathPrompt
 
-from pathlib import Path
 import os
+from pathlib import Path
 
-from utils import BACK_CHOICE, DONE_CHOICE, HELP_CHOICE, SHOW_CHOICE, is_back, is_done, is_help, is_show, load_combinators, load_instructions
 from validators import FileExtensionValidator, ParameterValidator, ChoiceValidator
-from instructions import AttackerSection, Combinator, Entity, Instruction
-
-from commands import Command
+from instructions import AttackerSection, Combinator, Entity, Instruction, BaseChoice
+from utils import BACK_CHOICE, DONE_CHOICE, HELP_CHOICE, SHOW_CHOICE, is_back, is_done, is_help, is_show, load_combinators, load_instructions
 
 def print_entity(
         entity: str, 
@@ -23,12 +21,13 @@ def print_entity(
         print(f"Saved in: {output_path}\n")
 
 # A global variable that defines if using description or not?
-# TODO refactor with a superclass BaseChoice
+# TODO: refactor with a superclass BaseChoice
 def build_choices(
-        items : list[Combinator] | list[Instruction] | list[Command],
+        items : list[BaseChoice],
         extra_choices : list[Choice] = [],
         include_desc : bool = False
     ) -> list[Choice]:
+    
     """
     Build a list of choices for the given list of combinators or instructions
 
@@ -39,17 +38,19 @@ def build_choices(
     """
 
     if include_desc:
-        choices = [
-            *map(lambda item: Choice(value=item, name=f"{item.name} - {item.description}"), items),
-            *extra_choices
+        max_len = max(len(item.name) for item in items)
+        item_choices = [
+            *map(lambda item: Choice(value=item, name=f"{item.name.ljust(max_len)}   {item.description}"), items),
         ]
     else:
-        choices = [
+        item_choices = [
             *map(lambda item: Choice(value=item, name=item.name), items),
-            *extra_choices
         ]
 
-    return choices
+    return [
+        *item_choices,
+        *extra_choices
+    ]
 
 def build_instructions(
         instructions : list[Instruction],
@@ -128,7 +129,8 @@ def build_instructions(
 
             return expr
         
-        # TODO verify if nested ifz instructions isn't allowed even in enclave
+        # TODO: verify if nested ifz instructions isn't allowed even in enclave
+        # ifz is not atom
         sub_instr : list[Instruction] = [ins for ins in instructions if ins.name != "ifz"]
         left_sub_expr = build_sub_expr(sub_instr)
         right_sub_expr = build_sub_expr(sub_instr)
@@ -314,7 +316,7 @@ def get_combinators_actions(
         type : Entity
 ) -> tuple[list[Combinator], list[Instruction]]:
     
-    # get combinators
+    # load combinators
     raw_combinators : list = load_combinators()
     if not raw_combinators:
         raise RuntimeError("No entity combinators found. Please check the configuration.")
@@ -323,7 +325,7 @@ def get_combinators_actions(
         for combinator in raw_combinators
     ]
 
-    # get instructions
+    # load instructions
     instructions : dict = load_instructions()
     if not instructions:
         raise RuntimeError("No instructions found. Please check the configuration.")
@@ -333,16 +335,6 @@ def get_combinators_actions(
         for action in instructions
         if type.value in action.get("available_for", [])
     ]
-    
-    # entity_instructions : dict = instructions.get(type.value, [])
-    # if not entity_instructions:
-    #     raise RuntimeError("No entity instructions found. Please check the configuration.")
-    
-    # raw_actions : list = entity_instructions.get("actions", [])
-    # if not raw_actions:
-    #     raise RuntimeError("No entity actions found. Please check the configuration.")
-    
-    # actions : list[Instruction] = [Instruction.model_validate(action) for action in raw_actions]
 
     return combinators, actions
 
