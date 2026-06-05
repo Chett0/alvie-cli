@@ -1,3 +1,4 @@
+from typing import Iterator
 import subprocess
 from pathlib import Path
 from collections import Counter
@@ -35,12 +36,6 @@ def run_alvie(
         args: list[str],
         std_output : bool = False
     ) -> None:
-
-    # execute if file .ml is modified
-    # subprocess.run(["dune", "build"],
-    #                 cwd=alvie_path,
-    #                 check=True
-    #                 )
     
     exe = f"{alvie_path}/_build/default/bin/{executable_name}"
     print(f"\nRunning {exe} with arguments")
@@ -49,22 +44,42 @@ def run_alvie(
     print()
 
     if std_output:
-        subprocess.run(
+        process = subprocess.run(
             [exe, *args], 
             cwd=alvie_path, 
             check=True
         )
         print("\n\n")
     else:
-        process = subprocess.run(
+        process = subprocess.Popen(
             [exe, *args],
             cwd=alvie_path,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            check=True
         )
-        raw_res = process.stdout
-        print_alvie_output(raw_res)
+        # raw_res = process.stdout
+        # print_alvie_output(raw_res)
+        symbols = load_output_symbols()
+        input_symbols, output_symbols = symbols["inputs"], symbols["outputs"]
+        output_counts: Counter[str] = Counter()
+
+        for i, line in enumerate(process.stdout):
+            if line.strip():
+                print(f"Hypothesis {i+1}\n")
+                for run in parse_hypothesis(         
+                    raw_hypothesis=line.strip(),
+                    input_symbols=input_symbols,
+                    output_symbols=output_symbols,
+                    output_counts=output_counts,
+                ):
+                    print(run, flush=True)           
+
+        process.wait()
+        if process.returncode != 0:
+            raise subprocess.CalledProcessError(process.returncode, exe)
+
+        print_recap(output_symbols, output_counts)
 
 
 def print_alvie_output(raw_res : str):
@@ -107,25 +122,34 @@ def parse_hypothesis(
         input_symbols: dict,
         output_symbols: dict,
         output_counts: Counter[str],
-) -> str:
+) -> Iterator[str]:
     """Parse one hypothesis containing several runs."""
-    parsed_runs = [
-        parse_run(
-            raw_run=raw_run,
-            input_symbols=input_symbols,
-            output_symbols=output_symbols,
-            output_counts=output_counts,
-        )
-        for raw_run in RUN_SEPARATOR_RE.split(raw_hypothesis)
-        if raw_run
-    ]
+    # parsed_runs = [
+    #     parse_run(
+    #         raw_run=raw_run,
+    #         input_symbols=input_symbols,
+    #         output_symbols=output_symbols,
+    #         output_counts=output_counts,
+    #     )
+    #     for raw_run in RUN_SEPARATOR_RE.split(raw_hypothesis)
+    #     if raw_run
+    # ]
 
-    runs_text = "\n".join(
-        f"Run {run_number}:\n{run}"
-        for run_number, run in enumerate(parsed_runs, start=1)
-    )
+    # runs_text = "\n".join(
+    #     f"Run {run_number}:\n{run}"
+    #     for run_number, run in enumerate(parsed_runs, start=1)
+    # )
 
-    return runs_text
+    # return runs_text
+    for run_number, raw_run in enumerate(RUN_SEPARATOR_RE.split(raw_hypothesis), start=1):
+        if raw_run:
+            run = parse_run(
+                raw_run=raw_run,
+                input_symbols=input_symbols,
+                output_symbols=output_symbols,
+                output_counts=output_counts,
+            )
+            yield f"Run {run_number}:\n{run}"
 
 
 def parse_run(
