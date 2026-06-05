@@ -1,6 +1,7 @@
 from InquirerPy.prompts.list import ListPrompt
 from InquirerPy.base.control import Choice
 
+from builder import build_entity
 from entities import Entity
 from executions import execute
     
@@ -26,7 +27,7 @@ def main():
         elif choice == "exit":
             return
         else:
-            choice.build()
+            build_entity(choice)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,20 @@
+{
+  "name": "Learn",
+  "executable": "learn.exe",
+  "args": [
+    "--att-spec",
+    "/home/alvie/spec-lib/example/attacker.atdl",
+    "--encl-spec",
+    "/home/alvie/spec-lib/example/enclave.etdl",
+    "--oracle",
+    "randomwalk",
+    "--tmpdir",
+    "/tmp/alvie",
+    "--res",
+    "/tmp/alvie/result.dot",
+    "--sancus",
+    "/home/alvie/sancus-core-gap",
+    "--secret",
+    "0"
+  ]
+}

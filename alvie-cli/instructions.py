@@ -6,16 +6,6 @@ class Entity(Enum):
     ENCLAVE     = "enclave"
     ATTACKER    = "attacker"
 
-    def build(self):
-        # TODO Refactor to resolve circular import 
-        from entities import build_enclave, build_attacker
-        if self == Entity.ENCLAVE:
-            build_enclave()
-        elif self == Entity.ATTACKER:
-            build_attacker()
-        else:
-            raise RuntimeError(f"Unknown entity type: {self.value}")
-
 class AttackerSection(Enum):
     ISR = "isr"
     PREPARE = "prepare"
@@ -35,26 +25,27 @@ class Operand(Enum):
 
     def is_valid(self, value: str) -> bool:
         
-        if self == Operand.REGISTER:
-            return self.is_register(value)
-        elif self == Operand.MEMORY_LABEL:
-            return self.is_label(value)
-        elif self == Operand.REG_ADDRESS:
-            return self.is_reg_address(value)
-        elif self == Operand.LABEL_ADDRESS:
-            return self.is_label_address(value)
-        elif self == Operand.DEREF:
-            return self.is_deref(value)
-        elif self == Operand.IMMEDIATE:
-            return self.is_immediate(value)
-        elif self == Operand.SECRET:
-            return self.is_secret(value)
-        elif self == Operand.IDENT:
-            return self.is_ident(value)
-        elif self == Operand.INT:
-            return self.is_positive_int(value)
-        else:
-            raise ValueError(f"Unknown operand type: {self.value}")
+        match self:
+            case Operand.REGISTER:
+                return self.is_register(value)
+            case Operand.MEMORY_LABEL:
+                return self.is_label(value)
+            case Operand.REG_ADDRESS:
+                return self.is_reg_address(value)
+            case Operand.LABEL_ADDRESS:
+                return self.is_label_address(value)
+            case Operand.DEREF:
+                return self.is_deref(value)
+            case Operand.IMMEDIATE:
+                return self.is_immediate(value)
+            case Operand.SECRET:
+                return self.is_secret(value)
+            case Operand.IDENT:
+                return self.is_ident(value)
+            case Operand.INT:
+                return self.is_positive_int(value)
+            case _:
+                raise ValueError(f"Unknown operand type: {self.value}")
 
     # Register --> r{0-14}
     def is_register(self, value: str) -> bool:

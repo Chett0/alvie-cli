@@ -25,7 +25,6 @@ def is_show(value) -> bool:
     return value == SHOW_CHOICE.value
 
 def get_alvie_code_path() -> Path:
-    # alvie_code_path = os.getenv("ALVIE_CODE_PATH")
     alvie_code_path = os.environ["ALVIE_CODE_PATH"]
 
     if not alvie_code_path:
