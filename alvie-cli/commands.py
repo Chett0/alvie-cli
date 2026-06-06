@@ -13,7 +13,7 @@ from InquirerPy.base.control import Choice
 
 
 from instructions import BaseChoice
-from validators import FileExtensionValidator, DirectoryValidator, IntValidator, ValuesValidator
+from validators import FileExtensionValidator, DirectoryValidator, IntValidator, ValuesValidator, HexValidator
 
 class InputType(Enum):
     FILENAME = "filename"
@@ -21,6 +21,8 @@ class InputType(Enum):
     CHOICE = "choice"
     BOOLEAN = "boolean"
     INT = "int"
+    HEX = "hex"
+    HASH = "hash" # to complete
 
 class Validation(BaseModel):
     must_exists: bool = True
@@ -66,6 +68,8 @@ class Argument(BaseModel):
                 self._validator = ValuesValidator(
                     values=self.values 
                 )
+            case InputType.HEX:
+                self._validator = HexValidator()
 
         return self
 
@@ -106,7 +110,7 @@ class Argument(BaseModel):
 
                 return selected_boolean
         
-            case InputType.INT:
+            case InputType.INT | InputType.HEX:
                 selected_int : str = InputPrompt(
                     message=message,
                     default=self.default,
@@ -114,7 +118,7 @@ class Argument(BaseModel):
                 ).execute()
 
                 return selected_int
-        
+
             case _:
                 raise ValueError(f"Argument {self.flag} has unknown type {self.type}.")
 

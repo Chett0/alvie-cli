@@ -93,7 +93,7 @@
         ]
     },
     {
-        "name" : "Fa",
+        "name" : "Flow-analysis",
         "description" : "Find flow-analysis (NI) violations between two models",
         "executable" : "fa.exe",
         "args": [
@@ -172,6 +172,97 @@
                 "flag": "--debug",
                 "type": "boolean",
                 "description": "Enable debug-level logging",
+                "required": false
+            }
+        ]
+    },
+    {
+        "name": "Execute",
+        "description": "Runs the given raw input on the specified version of Sancus with the given SUL configuration",
+        "executable": "exec.exe",
+        "args": [
+            {
+                "flag": "--att-spec",
+                "type": "filename",
+                "description": "Path to attacker specification (.atdl file)",
+                "extension": ".atdl",
+                "validation": {
+                    "must_exists": true
+                },
+                "default": "/home/alvie/spec-lib/example/attacker.atdl",
+                "required": true
+            },
+            {
+                "flag": "--encl-spec",
+                "type": "filename",
+                "description": "Path to enclave specification (.etdl file)",
+                "extension": ".etdl",
+                "validation": {
+                    "must_exists": true
+                },
+                "default": "/home/alvie/spec-lib/example/enclave.etdl",
+                "required": true
+            },
+            {
+                "flag": "--tmpdir",
+                "type": "directory",
+                "description": "Temp directory for simulation files",
+                "validation": {
+                    "must_exists": false
+                },
+                "default": "/tmp/alvie",
+                "required": true
+            },
+            {
+                "flag": "--sancus",
+                "type": "directory",
+                "description": "Path to Sancus simulator root",
+                "validation": {
+                    "must_exists": true
+                },
+                "default": "/home/alvie/sancus-core-gap",
+                "required": true
+            },
+            {
+                "flag": "--sexp-input",
+                "type": "filename",
+                "description": "Symbolic expression representing the raw input for the simulator"
+            },
+            {
+                "flag": "--commit",
+                "type": "hash",
+                "description": "Simulator git commit to use",
+                "required": false
+            },
+            {
+                "flag": "--secret",
+                "type": "int",
+                "description": "Secret value",
+                "default": "0",
+                "required": false
+            },
+            {
+                "flag": "--ignore-interrupts",
+                "type": "boolean",
+                "description": "Collapse interrupt outputs",
+                "required": false
+            },
+            {
+                "flag": "--sancus-master-key",
+                "type": "hex",
+                "description": "Master key",
+                "required": false
+            },
+            {
+                "flag": "--debug",
+                "type": "boolean",
+                "description": "Enable debug-level logging",
+                "required": false
+            },
+            {
+                "flag": "--info",
+                "type": "boolean",
+                "description": "Enable info-level logging",
                 "required": false
             }
         ]

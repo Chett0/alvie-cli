@@ -67,7 +67,19 @@ class IntValidator(Validator):
                 message="Input must be an integer",
                 cursor_position=document.cursor_position
             )
-        
+            
+class HexValidator(Validator):
+    def __init__(self):
+        pass
+    def validate(self, document: Document) -> None:
+        text = document.text.strip()
+        try:
+            int(text, 16)
+        except ValueError:
+            raise ValidationError(
+                message="Input must be a hexadecimal value",
+                cursor_position=document.cursor_position
+            )
 
 class ParameterValidator(Validator):
 
