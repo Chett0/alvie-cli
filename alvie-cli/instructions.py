@@ -1,6 +1,6 @@
 import re
 from enum import Enum
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 class Entity(Enum):
     ENCLAVE     = "enclave"
@@ -145,13 +145,13 @@ class BaseChoice(BaseModel):
     description: str
 
 class Param(BaseModel):
-    operands: list[Operand] = []
+    operands: list[Operand] = Field(default_factory=list)
 
 class Instruction(BaseChoice):
-    params: list[Param] = []
+    params: list[Param] = Field(default_factory=list)
     examples: list[str] | None = None
     atom : bool = False
-    available_for: list[Entity] = []
+    available_for: list[Entity] = Field(default_factory=list)
 
     def get_num_params(self) -> int:
         return len(self.params)

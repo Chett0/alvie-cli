@@ -14,11 +14,14 @@ from InquirerPy.prompts.filepath import FilePathPrompt
 from entities import build_choices
 from validators import FileExtensionValidator
 
+dict_commands: dict[str, Command] = {}
 
 def get_commands() -> list[Command]:
     raw_commands : list = load_commands()
+
     if not raw_commands:
         raise RuntimeError("No commands found. Please check the configuration.")
+    
     commands : list[Command] = [
         Command.model_validate(raw_command) 
         for raw_command in raw_commands
@@ -85,7 +88,7 @@ def collect_arg(arg: Argument, args: list[str]):
         args.extend([f"{arg.flag}", value])
 
 
-def select_config() -> tuple[bool, ConfigCommand]:
+def select_config(dict_commands: dict[str, Command]) -> tuple[bool, ConfigCommand | None]:
     file : str = FilePathPrompt(
             message="Select the configuration file for the command:",
             default="/home/alvie/alvie-cli/config/config.json",
@@ -98,24 +101,66 @@ def select_config() -> tuple[bool, ConfigCommand]:
     file_path : Path = Path(file)
     config_command : ConfigCommand = get_config_command(file_path)
 
+    command : Command | None = dict_commands.get(config_command.name)
+    if not command:
+        print(f"Command {config_command.name} not found in the configuration.")
+        return False, None
+    
+    previous_args : Argument | None = None
+    for arg in config_command.args:
+        if arg.startswith("--"):
+            if previous_args:
+                print(f"Argument {previous_args.flag} has no value in the configuration.")
+                return False, None
+
+            command_arg : Argument | None = command.get_arg_by_flag(arg)
+            if not command_arg:
+                print(f"Argument {arg} not found in command {config_command.name}.")
+                return False, None
+            
+            if command_arg.needs_value():
+                previous_args = command_arg
+            else:
+                previous_args = None
+        else:
+            if not previous_args:
+                print(f"Value {arg} has no corresponding argument flag in the configuration.")
+                return False, None
+            
+            try:
+                previous_args.validate_value(arg)
+            except Exception as error:
+                print(f"Validation error for argument {previous_args.flag}: {error}")
+                return False, None
+            
+            previous_args = None
+
     return True, config_command
 
 
 def execute() -> None:
+    global dict_commands
+
     try:
         alvie_path : Path = get_alvie_code_path()
     except EnvironmentError as error:
         print(error)
         raise SystemExit(1)
     
-    commands : list[Command] = get_commands()
+    if not dict_commands:
+        commands : list[Command] = get_commands()
+        dict_commands = {
+            command.name : command
+            for command in commands
+        }
+    else:
+        commands = list(dict_commands.values())
 
     choices : list[Choice] = build_choices(
         items=commands,
         extra_choices=[DONE_CHOICE]
     )
-
-    
+        
     config : bool = ConfirmPrompt(
         message="Do you want to use a configuration?",
         default=True,
@@ -156,7 +201,9 @@ def execute() -> None:
                 }, config_file, indent=2)
 
     else:
-        execute, command = select_config()
+        execute, command = select_config(dict_commands)
+        if command is None:
+            return
         args = command.args
         executable = command.executable
 

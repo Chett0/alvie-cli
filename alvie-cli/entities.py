@@ -3,9 +3,11 @@ from InquirerPy.prompts.list import ListPrompt
 from InquirerPy.prompts.input import InputPrompt
 from InquirerPy.prompts.fuzzy import FuzzyPrompt
 from InquirerPy.prompts.filepath import FilePathPrompt
+from InquirerPy.prompts.confirm import ConfirmPrompt
 
 import os
 from pathlib import Path
+from typing import Sequence
 
 from validators import FileExtensionValidator, ParameterValidator, ChoiceValidator
 from instructions import AttackerSection, Combinator, Entity, Instruction, BaseChoice
@@ -21,9 +23,8 @@ def print_entity(
         print(f"Saved in: {output_path}\n")
 
 # A global variable that defines if using description or not?
-# TODO: refactor with a superclass BaseChoice
 def build_choices(
-        items : list[BaseChoice],
+        items : Sequence[BaseChoice],
         extra_choices : list[Choice] = [],
         include_desc : bool = False
     ) -> list[Choice]:
@@ -345,12 +346,9 @@ def save_entity(
         file_extension_validator : FileExtensionValidator,
 ) -> Path | None: 
     
-    save = ListPrompt(
+    save = ConfirmPrompt(
         message="Save generated entity?",
-        choices=[
-            Choice(value=True, name="yes"),
-            Choice(value=False, name="no")
-        ]
+        default=True
     ).execute()
 
     if not save:
@@ -366,12 +364,9 @@ def save_entity(
         path = Path(output_path)
         
         if path.exists():
-            overwrite = ListPrompt(
+            overwrite = ConfirmPrompt(
                 message="File already exists. Overwrite?",
-                choices=[
-                    Choice(value=True, name="yes"),
-                    Choice(value=False, name="no")
-                ]
+                default=True
             ).execute()
 
             if not overwrite:

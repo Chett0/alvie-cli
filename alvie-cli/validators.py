@@ -1,3 +1,4 @@
+from enum import Enum
 from pathlib import Path
 
 from InquirerPy.separator import Separator
@@ -85,7 +86,9 @@ class ParameterValidator(Validator):
             cursor_position=document.cursor_position
         )
     
+
 class ChoiceValidator(Validator):
+    """Validator for general choice prompts. Used for validation on FuzzyPrompt"""
 
     def __init__(self, choices: list[Choice]):
         self.choices_values = [
@@ -99,4 +102,18 @@ class ChoiceValidator(Validator):
             raise ValidationError(
                 message="Please select a valid instruction from the list",
                 cursor_position=document.cursor_position,
+            )
+
+
+class ValuesValidator(Validator):
+    """Validator for choice arguments"""
+
+    def __init__(self, values: list[str]):
+        self.values : list = values
+
+    def validate(self, document: Document) -> None:
+        if document.text not in self.values:
+            raise ValidationError(
+                message=f"Input {document.text} does not match any of the expected values",
+                cursor_position=document.cursor_position
             )

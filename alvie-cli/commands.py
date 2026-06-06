@@ -2,14 +2,18 @@ from enum import Enum
 from unittest import case
 from typing_extensions import Self
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
+
 from prompt_toolkit.validation import Validator
+from prompt_toolkit.document import Document
 
 from InquirerPy.prompts.input import InputPrompt
 from InquirerPy.prompts.filepath import FilePathPrompt
 from InquirerPy.prompts.list import ListPrompt
 from InquirerPy.base.control import Choice
 
-from validators import FileExtensionValidator, DirectoryValidator, IntValidator
+
+from instructions import BaseChoice
+from validators import FileExtensionValidator, DirectoryValidator, IntValidator, ValuesValidator
 
 class InputType(Enum):
     FILENAME = "filename"
@@ -55,9 +59,17 @@ class Argument(BaseModel):
             case InputType.INT:
                 self._validator = IntValidator()
 
+            case InputType.CHOICE:
+                if not self.values:
+                    raise ValueError(f"Argument {self.flag} is of type choice but no values were provided.")
+
+                self._validator = ValuesValidator(
+                    values=self.values 
+                )
+
         return self
 
-    def select_value(self) -> str:
+    def select_value(self) -> str | bool:
         message : str = f"{self.description} {'(required)' if self.required else '(optional)'}:"
         
         match self.type:
@@ -84,15 +96,15 @@ class Argument(BaseModel):
                 return selected_choice
         
             case InputType.BOOLEAN:
-                selected_boolean : str = ListPrompt(
+                selected_boolean : bool = ListPrompt(
                     message=message,
                     choices=[
-                        Choice(value="true", name="Yes"), 
-                        Choice(value="false", name="No")
+                        Choice(value=True, name="Yes"), 
+                        Choice(value=False, name="No")
                     ]
                 ).execute()
 
-                return bool(selected_boolean)
+                return selected_boolean
         
             case InputType.INT:
                 selected_int : str = InputPrompt(
@@ -106,12 +118,26 @@ class Argument(BaseModel):
             case _:
                 raise ValueError(f"Argument {self.flag} has unknown type {self.type}.")
 
-class Command(BaseModel):
-    name: str
-    description: str
+    def validate_value(self, value: str) -> None:
+        if self._validator:
+            document = Document(text=value)
+            self._validator.validate(document=document)
+    
+    def needs_value(self) -> bool:
+        return self.type != InputType.BOOLEAN
+
+
+class Command(BaseChoice):
     executable: str
     args: list[Argument] = Field(default_factory=list)
-        
+    
+    def get_arg_by_flag(self, flag: str) -> Argument | None:
+        for arg in self.args:
+            if arg.flag == flag:
+                return arg
+            
+        return None
+
 
 class ConfigCommand(BaseModel):
     name: str
