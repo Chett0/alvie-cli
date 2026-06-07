@@ -127,6 +127,23 @@
     "--sancus-master-key": {
         "type": "hex",
         "description": "Master key",
+        "default": "cafe",
         "required": false
+    },
+    "--att-spec1": {
+        "type": "filename",
+        "description": "Path to first attacker specification for the first run (.atdl file)",
+        "extension": ".atdl",
+        "validation": { "must_exists": true },
+        "default": "/home/alvie/spec-lib/example/attacker.atdl",
+        "required": true
+    },
+    "--att-spec2": {
+        "type": "filename",
+        "description": "Path to second attacker specification for the second run (.atdl file)",
+        "extension": ".atdl",
+        "validation": { "must_exists": true },
+        "default": "/home/alvie/spec-lib/example/attacker.atdl",
+        "required": true
     }
 }

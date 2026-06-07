@@ -13,7 +13,7 @@ from InquirerPy.base.control import Choice
 
 
 from instructions import BaseChoice
-from validators import FileExtensionValidator, DirectoryValidator, IntValidator, ValuesValidator, HexValidator
+from validators import FileExtensionValidator, DirectoryValidator, HashValidator, IntValidator, ValuesValidator, HexValidator
 
 class InputType(Enum):
     FILENAME = "filename"
@@ -22,7 +22,7 @@ class InputType(Enum):
     BOOLEAN = "boolean"
     INT = "int"
     HEX = "hex"
-    HASH = "hash" # to complete
+    HASH = "hash"
 
 class Validation(BaseModel):
     must_exists: bool = True
@@ -71,6 +71,9 @@ class Argument(BaseModel):
                 )
             case InputType.HEX:
                 self._validator = HexValidator()
+            
+            case InputType.HASH:
+                self._validator = HashValidator()
 
         return self
 

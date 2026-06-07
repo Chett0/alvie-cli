@@ -74,10 +74,31 @@ class HexValidator(Validator):
     def validate(self, document: Document) -> None:
         text = document.text.strip()
         try:
-            int(text, 16)
+            bytes.fromhex(text)
         except ValueError:
             raise ValidationError(
-                message="Input must be a hexadecimal value",
+                message="Input must be a 32-character hexadecimal value",
+                cursor_position=document.cursor_position
+            )
+
+# Need support for abbreviated hashes?
+class HashValidator(Validator):
+    def __init__(self):
+        pass
+
+    def validate(self, document: Document) -> None:
+        text = document.text.strip()
+        try:
+            sha1 = bytes.fromhex(text)
+        except ValueError:
+            raise ValidationError(
+                message="Input must be a valid hexadecimal string",
+                cursor_position=document.cursor_position
+            )
+        
+        if len(sha1) != 20:
+            raise ValidationError(
+                message=f"SHA-1 hash must be exactly 40 characters long (got {len(text)})",
                 cursor_position=document.cursor_position
             )
 

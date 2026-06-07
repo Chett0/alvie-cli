@@ -48,5 +48,23 @@
             "--debug",
             "--info"
         ]
+    },
+    {
+        "name": "Property-based testing",
+        "description": "Random NI tests on the Sancus simulator without learning a model. Faster than Learn",
+        "executable": "pbt.exe",
+        "args": [
+            "--att-spec1",
+            "--att-spec2",
+            "--encl-spec",
+            "--step-limit",
+            "--tmpdir",
+            "--sancus",
+            "--commit",
+            "--ignore-interrupts",
+            "--sancus-master-key",
+            "--debug",
+            "--info"
+        ]
     }
 ]
