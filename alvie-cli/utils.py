@@ -3,6 +3,9 @@ import json
 from pathlib import Path
 from dotenv import load_dotenv
 
+from InquirerPy.prompts.filepath import FilePathPrompt
+from InquirerPy.prompts.confirm import ConfirmPrompt
+
 from InquirerPy.base.control import Choice
 
 load_dotenv()
@@ -63,3 +66,36 @@ def load_output_symbols():
     output_symbols_path = Path(__file__).resolve().parent.parent / "config" / "output_symbols.json"
     with output_symbols_path.open("r") as file:
         return json.load(file)
+    
+def validate_save_path(
+    message: str,
+    default_path: str,
+    validator=None
+) -> Path | None:
+    """
+    Ask the user a save path for a new file.
+    Manage overwrite and parent directory creation.
+    Return the path of the saved file or None if the user decide to cancel the operation.
+    """
+    while True:
+        output_path: str = FilePathPrompt(
+            message=message,
+            default=default_path,
+            validate=validator
+        ).execute()
+        
+        path = Path(output_path)
+        
+        if path.exists():
+            overwrite = ConfirmPrompt(
+                message=f"File '{path.name}' already exists. Overwrite?",
+                default=True
+            ).execute()
+
+            if not overwrite:
+                print("Please choose another file path.")
+                continue  # Insert another path
+                
+        # Create parent directories if they don't exist
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path

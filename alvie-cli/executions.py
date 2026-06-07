@@ -1,8 +1,9 @@
 import json
+import os
 from pathlib import Path
 
 from commands import Command, Argument, ConfigCommand
-from utils import BACK_CHOICE, DONE_CHOICE, get_alvie_code_path, is_back, is_done, load_args, load_commands
+from utils import BACK_CHOICE, DONE_CHOICE, get_alvie_code_path, is_back, is_done, load_args, load_commands, validate_save_path
 from output import run_alvie
 
 from InquirerPy.prompts.fuzzy import FuzzyPrompt
@@ -103,7 +104,7 @@ def collect_arg(arg: Argument, args: list[str]):
 def select_config(dict_commands: dict[str, Command]) -> tuple[bool, ConfigCommand | None]:
     file : str = FilePathPrompt(
             message="Select the configuration file for the command:",
-            default="/home/alvie/alvie-cli/config/config.json",
+            default="/home/alvie/alvie-cli/presets/config.json",
             validate=FileExtensionValidator(
                 expected_extension=".json",
                 must_exists=True
@@ -196,22 +197,26 @@ def execute() -> None:
         ).execute()
 
         if dump_config:
-            config_path : str = FilePathPrompt(
-                    message="Select the path where to save the configuration:",
-                    default="/home/alvie/alvie-cli/config/config.json",
-                    validate=FileExtensionValidator(
-                        expected_extension=".json",
-                        must_exists=False
-                    )
-                ).execute()
-
-            with open(config_path, "w") as config_file:
-                json.dump({
-                    "name" : action.name,
-                    "executable" : executable,
-                    "args": args
-                }, config_file, indent=2)
-
+            WORKING_PATH = os.environ.get("WORKING_PATH", "/home/alvie/alvie-cli")
+            
+            config_path = validate_save_path(
+                message="Select the path where to save the configuration:",
+                default_path=f"{WORKING_PATH}/presets/config.json",
+                validator=FileExtensionValidator(
+                    expected_extension=".json",
+                    must_exists=False
+                )
+            )
+            
+            if config_path:
+                with open(config_path, "w") as config_file:
+                    json.dump({
+                        "name" : action.name,
+                        "executable" : executable,
+                        "args": args
+                    }, config_file, indent=2)
+                print(f"Configuration saved to {config_path}")
+                
     else:
         execute, command = select_config(dict_commands)
         if command is None:

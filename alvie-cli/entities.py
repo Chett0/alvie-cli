@@ -11,7 +11,7 @@ from typing import Sequence
 
 from validators import FileExtensionValidator, ParameterValidator, ChoiceValidator
 from instructions import AttackerSection, Combinator, Entity, Instruction, BaseChoice
-from utils import BACK_CHOICE, DONE_CHOICE, HELP_CHOICE, SHOW_CHOICE, is_back, is_done, is_help, is_show, load_combinators, load_instructions
+from utils import BACK_CHOICE, DONE_CHOICE, HELP_CHOICE, SHOW_CHOICE, is_back, is_done, is_help, is_show, load_combinators, load_instructions, validate_save_path
 
 def print_entity(
         entity: str, 
@@ -354,29 +354,11 @@ def save_entity(
     if not save:
         return None
     
-    while True:
-        
-        output_path : str = FilePathPrompt(
-            message="Output file:",
-            default=default,
-            validate=file_extension_validator
-        ).execute()
-        path = Path(output_path)
-        
-        if path.exists():
-            overwrite = ConfirmPrompt(
-                message="File already exists. Overwrite?",
-                default=True
-            ).execute()
-
-            if not overwrite:
-                print("Please choose another file name.")
-                continue
-            
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding="utf-8")
-        return path
-
+    return validate_save_path(
+        message="Output file:",
+        default_path=default,
+        validator=file_extension_validator
+    )
 
 def render_section(
         body: str,
