@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from commands import Command, Argument, ConfigCommand
-from utils import BACK_CHOICE, DONE_CHOICE, get_alvie_code_path, is_back, is_done, load_commands
+from utils import BACK_CHOICE, DONE_CHOICE, get_alvie_code_path, is_back, is_done, load_args, load_commands
 from output import run_alvie
 
 from InquirerPy.prompts.fuzzy import FuzzyPrompt
@@ -17,15 +17,27 @@ from validators import FileExtensionValidator
 dict_commands: dict[str, Command] = {}
 
 def get_commands() -> list[Command]:
-    raw_commands : list = load_commands()
-
-    if not raw_commands:
-        raise RuntimeError("No commands found. Please check the configuration.")
     
-    commands : list[Command] = [
-        Command.model_validate(raw_command) 
-        for raw_command in raw_commands
-    ]
+    raw_commands : list = load_commands()
+    raw_args : dict[str, dict] = load_args()
+    
+    commands : list[Command] = []
+    
+    # Load effective args
+    for raw_command in raw_commands:
+        
+        cmd = {key: value for key, value in raw_command.items() if key in {"name", "description", "executable"}}
+        cmd["args"] = []
+        
+        for arg in raw_command.get("args", []):
+            cmd_arg = {"flag": arg}
+            cmd_arg.update(raw_args.get(arg, {}))
+            cmd["args"].append(Argument.model_validate(cmd_arg))
+            
+        commands.append(Command.model_validate(cmd))
+
+    if not commands:
+        raise RuntimeError("No commands found. Please check the configuration.")
 
     return commands
 

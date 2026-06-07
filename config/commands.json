@@ -1,179 +1,34 @@
 [
     {
-        "name" : "Learn",
-        "description" : "Learn a Mealy machine model",
-        "executable" : "learn.exe",
-        "args" : [
-            {
-                "flag": "--att-spec",
-                "type": "filename",
-                "description": "Path to attacker specification (.atdl file)",
-                "extension": ".atdl",
-                "validation": {
-                    "must_exists": true
-                },
-                "default": "/home/alvie/spec-lib/example/attacker.atdl",
-                "required": true
-            },
-            {
-                "flag": "--encl-spec",
-                "type": "filename",
-                "description": "Path to enclave specification (.etdl file)",
-                "extension": ".etdl",
-                "validation": {
-                    "must_exists": true
-                },
-                "default": "/home/alvie/spec-lib/example/enclave.etdl",
-                "required": true
-            },
-            {
-                "flag": "--oracle",
-                "type": "choice",
-                "description": "Oracle that must be used for equivalence check",
-                "values" : ["randomwalk", "pac", "exhaustive"],
-                "required": true
-            },
-            {
-                "flag": "--tmpdir",
-                "type": "directory",
-                "description": "Temporary directory where intermediate results will be stored",
-                "validation": {
-                    "must_exists": false
-                },
-                "default": "/tmp/alvie",
-                "required": true
-            },
-            {
-                "flag": "--res",
-                "type": "filename",
-                "description": "File where the final learned model will be stored (.dot file)",
-                "extension": ".dot",
-                "validation": {
-                    "must_exists": false
-                },
-                "default": "/tmp/alvie/result.dot",
-                "required": true
-            },
-            {
-                "flag": "--sancus",
-                "type": "directory",
-                "description": "Directory where the sancus-core-gap repository was cloned",
-                "validation": {
-                    "must_exists": true
-                },
-                "default": "/home/alvie/sancus-core-gap",
-                "required": true
-            },
-            {
-                "flag": "--secret",
-                "type": "int",
-                "description": "Provide a secret value. Required if the enclave specification contains a secret variable '?'.",
-                "default": "0",
-                "required": false
-            },
-            {
-                "flag": "--step-limit",
-                "type": "int",
-                "description": "Max steps per random walk / PAC sample",
-                "default": "200",
-                "required": false
-            },
-            {
-                "flag": "--debug",
-                "type": "boolean",
-                "description": "Enable debug-level logging",
-                "required": false
-            },
-            {
-                "flag": "--info",
-                "type": "boolean",
-                "description": "Enable info-level logging",
-                "required": false
-            }
+        "name": "Learn",
+        "description": "Learn a Mealy machine model",
+        "executable": "learn.exe",
+        "args": [
+            "--att-spec",
+            "--encl-spec",
+            "--oracle",
+            "--tmpdir",
+            "--res",
+            "--sancus",
+            "--secret",
+            "--step-limit",
+            "--debug",
+            "--info"
         ]
     },
     {
-        "name" : "Flow-analysis",
-        "description" : "Find flow-analysis (NI) violations between two models",
-        "executable" : "fa.exe",
+        "name": "Flow-analysis",
+        "description": "Find flow-analysis (NI) violations between two models",
+        "executable": "fa.exe",
         "args": [
-            {
-                "flag": "--m1-int",
-                "type": "filename",
-                "extension": ".dot",
-                "description": "Path to first Mealy machine model (.dot file) (interrupt variant)",
-                "default": "/tmp/alvie/m1_int.dot",
-                "validation": {
-                    "must_exists": true
-                },
-                "required": true
-            },
-            {
-                "flag": "--m2-int",
-                "type": "filename",
-                "extension": ".dot",
-                "description": "Path to second Mealy machine model (.dot file) (interrupt variant)",
-                "default": "/tmp/alvie/m2_int.dot",
-                "validation": {
-                    "must_exists": true
-                },
-                "required": true
-            },
-            {
-                "flag": "--m1-nint",
-                "type": "filename",
-                "extension": ".dot",
-                "description": "Path to first Mealy machine model (.dot file) (non-interrupt variant)",
-                "default": "/tmp/alvie/m1_nint.dot",
-                "validation": {
-                    "must_exists": true
-                },
-                "required": true
-            },
-            {
-                "flag": "--m2-nint",
-                "type": "filename",
-                "extension": ".dot",
-                "description": "Path to second Mealy machine model (.dot file) (non-interrupt variant)",
-                "default": "/tmp/alvie/m2_nint.dot",
-                "validation": {
-                    "must_exists": true
-                },
-                "required": true
-            },
-            {
-                "flag": "--witness-file-basename",
-                "type": "directory",
-                "description": "Output path prefix",
-                "validation": {
-                    "must_exists": false
-                },
-                "default": "/tmp/alvie/witness",
-                "required": true
-            },
-            {
-                "flag": "--tmpdir",
-                "type": "directory",
-                "description": "Directory for intermediate mCRL2 files",
-                "validation": {
-                    "must_exists": true
-                },
-                "default": "/tmp/alvie",
-                "required": true
-            },
-            {
-                "flag": "--cex-limit",
-                "type": "int",
-                "description": "Number of counterexamples to enumerate",
-                "default": "1",
-                "required": false
-            },
-            {
-                "flag": "--debug",
-                "type": "boolean",
-                "description": "Enable debug-level logging",
-                "required": false
-            }
+            "--m1-int",
+            "--m2-int",
+            "--m1-nint",
+            "--m2-nint",
+            "--witness-file-basename",
+            "--tmpdir",
+            "--cex-limit",
+            "--debug"
         ]
     },
     {
@@ -181,90 +36,17 @@
         "description": "Runs the given raw input on the specified version of Sancus with the given SUL configuration",
         "executable": "exec.exe",
         "args": [
-            {
-                "flag": "--att-spec",
-                "type": "filename",
-                "description": "Path to attacker specification (.atdl file)",
-                "extension": ".atdl",
-                "validation": {
-                    "must_exists": true
-                },
-                "default": "/home/alvie/spec-lib/example/attacker.atdl",
-                "required": true
-            },
-            {
-                "flag": "--encl-spec",
-                "type": "filename",
-                "description": "Path to enclave specification (.etdl file)",
-                "extension": ".etdl",
-                "validation": {
-                    "must_exists": true
-                },
-                "default": "/home/alvie/spec-lib/example/enclave.etdl",
-                "required": true
-            },
-            {
-                "flag": "--tmpdir",
-                "type": "directory",
-                "description": "Temp directory for simulation files",
-                "validation": {
-                    "must_exists": false
-                },
-                "default": "/tmp/alvie",
-                "required": true
-            },
-            {
-                "flag": "--sancus",
-                "type": "directory",
-                "description": "Path to Sancus simulator root",
-                "validation": {
-                    "must_exists": true
-                },
-                "default": "/home/alvie/sancus-core-gap",
-                "required": true
-            },
-            {
-                "flag": "--sexp-input",
-                "type": "filename",
-                "description": "Symbolic expression representing the raw input for the simulator"
-            },
-            {
-                "flag": "--commit",
-                "type": "hash",
-                "description": "Simulator git commit to use",
-                "required": false
-            },
-            {
-                "flag": "--secret",
-                "type": "int",
-                "description": "Secret value",
-                "default": "0",
-                "required": false
-            },
-            {
-                "flag": "--ignore-interrupts",
-                "type": "boolean",
-                "description": "Collapse interrupt outputs",
-                "required": false
-            },
-            {
-                "flag": "--sancus-master-key",
-                "type": "hex",
-                "description": "Master key",
-                "required": false
-            },
-            {
-                "flag": "--debug",
-                "type": "boolean",
-                "description": "Enable debug-level logging",
-                "required": false
-            },
-            {
-                "flag": "--info",
-                "type": "boolean",
-                "description": "Enable info-level logging",
-                "required": false
-            }
+            "--att-spec",
+            "--encl-spec",
+            "--tmpdir",
+            "--sancus",
+            "--sexp-input",
+            "--commit",
+            "--secret",
+            "--ignore-interrupts",
+            "--sancus-master-key",
+            "--debug",
+            "--info"
         ]
     }
 ]

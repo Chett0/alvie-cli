@@ -27,10 +27,11 @@ class InputType(Enum):
 class Validation(BaseModel):
     must_exists: bool = True
 
+# TODO: superclass for different types (filename has extension required, ...)
 class Argument(BaseModel):
-    description: str
     flag: str
     type: InputType
+    description: str
     extension : str | None = None
     validation: Validation | None = None
     values : list[str] | None = None
