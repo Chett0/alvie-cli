@@ -10,10 +10,11 @@ from InquirerPy.prompts.input import InputPrompt
 from InquirerPy.prompts.filepath import FilePathPrompt
 from InquirerPy.prompts.list import ListPrompt
 from InquirerPy.base.control import Choice
-
+from InquirerPy.prompts.confirm import ConfirmPrompt
 
 from instructions import BaseChoice
 from validators import FileExtensionValidator, DirectoryValidator, HashValidator, IntValidator, ValuesValidator, HexValidator
+from flows import create_prompt
 
 class InputType(Enum):
     FILENAME = "filename"
@@ -77,18 +78,18 @@ class Argument(BaseModel):
 
         return self
 
-    def select_value(self) -> str | bool:
+    def select_value(self, allow_back: bool = True):
         message : str = f"{self.description} {'(required)' if self.required else '(optional)'}:"
         
         match self.type:
             case InputType.FILENAME | InputType.DIRECTORY:
-                path : str = FilePathPrompt(
+                prompt = create_prompt(
+                    FilePathPrompt,
+                    allow_back=allow_back,
                     message=message,
                     default=self.default,
                     validate=self._validator
-                ).execute()
-
-                return path
+                )
         
             case InputType.CHOICE:
                 if not self.values:
@@ -96,35 +97,34 @@ class Argument(BaseModel):
                 
                 choices = [Choice(value=value, name=value) for value in self.values]
 
-                selected_choice : str = ListPrompt(
+                prompt = create_prompt(
+                    ListPrompt,
+                    allow_back=allow_back,
                     message=message,
                     choices=choices
-                ).execute()
-
-                return selected_choice
+                )
         
             case InputType.BOOLEAN:
-                selected_boolean : bool = ListPrompt(
+                prompt = create_prompt(
+                    ConfirmPrompt,
+                    allow_back=allow_back,
                     message=message,
-                    choices=[
-                        Choice(value=True, name="Yes"), 
-                        Choice(value=False, name="No")
-                    ]
-                ).execute()
-
-                return selected_boolean
+                    default=True
+                )
         
             case InputType.INT | InputType.HEX:
-                selected_int : str = InputPrompt(
+                prompt = create_prompt(
+                    InputPrompt,
+                    allow_back=allow_back,
                     message=message,
                     default=self.default,
                     validate=self._validator
-                ).execute()
-
-                return selected_int
+                )
 
             case _:
                 raise ValueError(f"Argument {self.flag} has unknown type {self.type}.")
+            
+        return prompt.execute()
 
     def validate_value(self, value: str) -> None:
         if self._validator:

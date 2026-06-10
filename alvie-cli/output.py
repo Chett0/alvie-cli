@@ -58,13 +58,16 @@ def run_alvie(
             stderr=subprocess.PIPE,
             text=True,
         )
-        # raw_res = process.stdout
-        # print_alvie_output(raw_res)
+
         symbols = load_output_symbols()
         input_symbols, output_symbols = symbols["inputs"], symbols["outputs"]
         output_counts: Counter[str] = Counter()
+        
+        raw_output = process.stdout
+        if not raw_output:
+            raise RuntimeError("No output from Alvie process.")
 
-        for i, line in enumerate(process.stdout):
+        for i, line in enumerate(raw_output):
             if line.strip():
                 print(f"Hypothesis {i+1}\n")
                 for run in parse_hypothesis(         
