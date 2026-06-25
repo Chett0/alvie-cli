@@ -56,5 +56,5 @@ saving a command. It contains the command `name`, its `executable` and the list 
 Assuming the file above is saved as `presets/config.json`, run it with:
 
 ```bash
-python alvie-cli presets/config.json -a
+python alvie-cli presets/config.json -s
 ```
