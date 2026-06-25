@@ -1,10 +1,99 @@
 from typing import Iterator
+import os
+import sys
+import threading
 import subprocess
 from pathlib import Path
 from collections import Counter
 import re
 
 from utils import load_output_symbols
+
+RESET = "\033[0m"
+BOLD = "\033[1m"
+DIM = "\033[2m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+RED = "\033[31m"
+CYAN = "\033[38;2;110;230;220m"
+
+
+def _supports_color() -> bool:
+    return sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
+
+
+def _style(text: str, *codes: str) -> str:
+    if not _supports_color():
+        return text
+    return f"{''.join(codes)}{text}{RESET}"
+
+
+def info(message: str) -> None:
+    print(_style(message, CYAN))
+
+
+def success(message: str) -> None:
+    print(_style(message, GREEN, BOLD))
+
+
+def warn(message: str) -> None:
+    print(_style(message, YELLOW, BOLD))
+
+
+def error(message: str) -> None:
+    print(_style(message, RED, BOLD))
+
+
+def hint(message: str) -> None:
+    print(_style(message, DIM))
+
+
+class Spinner:
+    """Show a colored message with dots that appear and disappear while waiting."""
+
+    def __init__(self, message: str, max_dots: int = 3, interval: float = 0.4):
+        self.message = message
+        self.max_dots = max_dots
+        self.interval = interval
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._animated = _supports_color()
+
+    def start(self) -> "Spinner":
+        if not self._animated:
+            info(self.message)
+            return self
+        self._thread = threading.Thread(target=self._spin, daemon=True)
+        self._thread.start()
+        return self
+
+    def _spin(self) -> None:
+        colored = _style(self.message, CYAN)
+        step = 0
+        while not self._stop.is_set():
+            dots = "." * (step % (self.max_dots + 1))
+            padding = " " * (self.max_dots - len(dots))
+            sys.stdout.write(f"\r{colored}{dots}{padding}")
+            sys.stdout.flush()
+            step += 1
+            self._stop.wait(self.interval)
+
+    def stop(self) -> None:
+        if not self._animated:
+            return
+        self._animated = False
+        self._stop.set()
+        if self._thread:
+            self._thread.join()
+        # Erase the animated line so the next output starts clean.
+        sys.stdout.write("\r" + " " * (len(self.message) + self.max_dots) + "\r")
+        sys.stdout.flush()
+
+    def __enter__(self) -> "Spinner":
+        return self.start()
+
+    def __exit__(self, *_exc) -> None:
+        self.stop()
 
 SGR_TO_COLOR : dict[str, str] = {
     "31": "red",
@@ -38,51 +127,99 @@ def run_alvie(
     ) -> None:
     
     exe = f"{alvie_path}/_build/default/bin/{executable_name}"
-    print(f"\nRunning {exe} with arguments")
-    for i in range(len(args)//2):
-        print(f"\t{args[2*i]}: {args[2*i+1]}")
+
+    print()
+    info(f"Running {_style(executable_name, CYAN, BOLD)}")
+    hint(f"  {exe}\n")
+    if args:
+        info("Arguments:")
+        for i in range(len(args)//2):
+            print(f"\t{_style(args[2*i], CYAN)}: {args[2*i+1]}")
+    else:
+        hint("  (no arguments)")
+    hint("\nPress Ctrl+C to stop the execution.")
     print()
 
-    if std_output:
-        process = subprocess.run(
-            [exe, *args], 
-            cwd=alvie_path, 
-            check=True
-        )
-        print("\n\n")
-    else:
-        process = subprocess.Popen(
-            [exe, *args],
-            cwd=alvie_path,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+    process: subprocess.Popen | None = None
+    spinner: Spinner | None = None
+    try:
+        if std_output:
+            info("Streaming standard output")
+            print()
+            process = subprocess.Popen(
+                [exe, *args],
+                cwd=alvie_path,
+            )
+            process.wait()
+            print("\n")
+            if process.returncode != 0:
+                raise subprocess.CalledProcessError(process.returncode, exe)
+        else:
+            process = subprocess.Popen(
+                [exe, *args],
+                cwd=alvie_path,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
 
-        symbols = load_output_symbols()
-        input_symbols, output_symbols = symbols["inputs"], symbols["outputs"]
-        output_counts: Counter[str] = Counter()
-        
-        raw_output = process.stdout
-        if not raw_output:
-            raise RuntimeError("No output from Alvie process.")
+            symbols = load_output_symbols()
+            input_symbols, output_symbols = symbols["inputs"], symbols["outputs"]
+            output_counts: Counter[str] = Counter()
 
-        for i, line in enumerate(raw_output):
-            if line.strip():
-                print(f"Hypothesis {i+1}\n")
-                for run in parse_hypothesis(         
-                    raw_hypothesis=line.strip(),
-                    input_symbols=input_symbols,
-                    output_symbols=output_symbols,
-                    output_counts=output_counts,
-                ):
-                    print(run, flush=True)           
+            raw_output = process.stdout
+            if not raw_output:
+                raise RuntimeError("No output from Alvie process.")
 
+            spinner = Spinner("Waiting for Alvie to produce hypotheses").start()
+
+            for i, line in enumerate(raw_output):
+                if line.strip():
+                    spinner.stop()
+                    print(f"Hypothesis {i+1}\n")
+                    for run in parse_hypothesis(
+                        raw_hypothesis=line.strip(),
+                        input_symbols=input_symbols,
+                        output_symbols=output_symbols,
+                        output_counts=output_counts,
+                    ):
+                        print(run, flush=True)
+                    spinner = Spinner("Waiting for the next hypothesis").start()
+
+            spinner.stop()
+            process.wait()
+            if process.returncode != 0:
+                raise subprocess.CalledProcessError(process.returncode, exe)
+
+            print_recap(output_symbols, output_counts)
+
+        success("Alvie finished successfully.\n")
+    except KeyboardInterrupt:
+        if spinner:
+            spinner.stop()
+        _terminate(process)
+        print()
+        warn("Execution interrupted by user.\n")
+    except subprocess.CalledProcessError as exc:
+        if spinner:
+            spinner.stop()
+        error(f"Alvie exited with a non-zero status ({exc.returncode}).")
+        raise
+
+
+def _terminate(process: subprocess.Popen | None) -> None:
+    """Stop a running Alvie process, escalating to a kill if it does not exit."""
+    if process is None or process.poll() is not None:
+        return
+
+    info("Stopping Alvie...")
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        warn("Alvie did not stop in time, forcing termination.\n")
+        process.kill()
         process.wait()
-        if process.returncode != 0:
-            raise subprocess.CalledProcessError(process.returncode, exe)
-
-        print_recap(output_symbols, output_counts)
 
 
 def print_alvie_output(raw_res : str):
@@ -127,23 +264,7 @@ def parse_hypothesis(
         output_counts: Counter[str],
 ) -> Iterator[str]:
     """Parse one hypothesis containing several runs."""
-    # parsed_runs = [
-    #     parse_run(
-    #         raw_run=raw_run,
-    #         input_symbols=input_symbols,
-    #         output_symbols=output_symbols,
-    #         output_counts=output_counts,
-    #     )
-    #     for raw_run in RUN_SEPARATOR_RE.split(raw_hypothesis)
-    #     if raw_run
-    # ]
 
-    # runs_text = "\n".join(
-    #     f"Run {run_number}:\n{run}"
-    #     for run_number, run in enumerate(parsed_runs, start=1)
-    # )
-
-    # return runs_text
     for run_number, raw_run in enumerate(RUN_SEPARATOR_RE.split(raw_hypothesis), start=1):
         if raw_run:
             run = parse_run(
