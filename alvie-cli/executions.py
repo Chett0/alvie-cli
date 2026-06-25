@@ -8,6 +8,8 @@ from InquirerPy.prompts.list import ListPrompt
 from InquirerPy.prompts.confirm import ConfirmPrompt
 from InquirerPy.prompts.filepath import FilePathPrompt
 
+from prompt_toolkit.validation import ValidationError
+
 from commands import Command, Argument, ConfigCommand
 from utils import DONE_CHOICE, get_alvie_code_path, is_done, load_args, load_commands, validate_save_path
 from output import run_alvie
@@ -20,7 +22,7 @@ ALVIE_PATH = get_alvie_code_path()
 commands_map : dict[str, Command] = {}
 
 
-def build_commands() -> None:
+def build_commands() -> dict[str, Command]:
     global commands_map
 
     raw_commands : list = load_commands()
@@ -49,6 +51,8 @@ def build_commands() -> None:
         for command in commands
     }
 
+    return commands_map
+
 
 def get_config_command(
         file_path : Path
@@ -60,6 +64,46 @@ def get_config_command(
         raise RuntimeError("No configuration command found.")
     
     command = ConfigCommand.model_validate(config_command)
+
+    return command
+
+
+def validate_config_command(config_command: ConfigCommand) -> Command:
+    """
+    Validate a loaded configuration against the known command/argument definitions.
+
+    Returns the matched Command. Raises ValueError if the command is unknown or any flag/value pairing is inconsistent.
+    """
+    command : Command | None = commands_map.get(config_command.name)
+    if not command:
+        raise ValueError(f"Command {config_command.name} not found in the configuration.")
+
+    pending_arg : Argument | None = None
+    for token in config_command.args:
+        if token.startswith("--"):
+            if pending_arg:
+                raise ValueError(f"Argument {pending_arg.flag} has no value in the configuration.")
+
+            command_arg : Argument | None = command.get_arg_by_flag(token)
+            if not command_arg:
+                raise ValueError(f"Argument {token} not found in command {config_command.name}.")
+
+            pending_arg = command_arg if command_arg.requires_value() else None
+        else:
+            if not pending_arg:
+                raise ValueError(f"Value {token} has no corresponding argument flag in the configuration.")
+
+            try:
+                pending_arg.validate_value(token)
+            except ValidationError as error:
+                raise ValueError(
+                    f"Validation error for argument {pending_arg.flag}: {error.message}"
+                ) from error
+
+            pending_arg = None
+
+    if pending_arg:
+        raise ValueError(f"Argument {pending_arg.flag} has no value in the configuration.")
 
     return command
 
@@ -144,39 +188,11 @@ def select_config(state: CommandState) -> StepOutput:
     file_path : Path = Path(file)
     config_command : ConfigCommand = get_config_command(file_path)
 
-    command : Command | None = commands_map.get(config_command.name)
-    if not command:
-        print(f"Command {config_command.name} not found in the configuration.")
+    try:
+        validate_config_command(config_command)
+    except ValueError as error:
+        print(error)
         return StepOutput.stay()
-    
-    previous_args : Argument | None = None
-    for arg in config_command.args:
-        if arg.startswith("--"):
-            if previous_args:
-                print(f"Argument {previous_args.flag} has no value in the configuration.")
-                return StepOutput.stay()
-
-            command_arg : Argument | None = command.get_arg_by_flag(arg)
-            if not command_arg:
-                print(f"Argument {arg} not found in command {config_command.name}.")
-                return StepOutput.stay()
-
-            if command_arg.needs_value():
-                previous_args = command_arg
-            else:
-                previous_args = None
-        else:
-            if not previous_args:
-                print(f"Value {arg} has no corresponding argument flag in the configuration.")
-                return StepOutput.stay()
-            
-            try:
-                previous_args.validate_value(arg)
-            except Exception as error:
-                print(f"Validation error for argument {previous_args.flag}: {error}")
-                return StepOutput.stay()
-            
-            previous_args = None
 
     state.args = config_command.args
     state.executable = config_command.executable

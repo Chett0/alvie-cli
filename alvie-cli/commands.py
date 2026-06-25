@@ -131,7 +131,7 @@ class Argument(BaseModel):
             document = Document(text=value)
             self._validator.validate(document=document)
     
-    def needs_value(self) -> bool:
+    def requires_value(self) -> bool:
         return self.type != InputType.BOOLEAN
 
 

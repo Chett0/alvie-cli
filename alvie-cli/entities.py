@@ -176,7 +176,6 @@ def build_instructions(
         num_params : int = instr.get_num_params()
 
         if num_params > 0:
-
             if instr.examples:
                 print(f"Examples:")
                 for example in instr.examples:
@@ -429,3 +428,12 @@ def build_attacker() -> None:
         entity=attacker_text, 
         output_path=output_path
     )
+
+
+def build_entity(entity: Entity):
+    if entity == Entity.ENCLAVE:
+        build_enclave()
+    elif entity == Entity.ATTACKER:
+        build_attacker()
+    else:
+        raise RuntimeError(f"Unknown entity type: {entity.value}")
