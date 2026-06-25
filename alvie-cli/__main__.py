@@ -14,6 +14,7 @@ from executions import (
 )
 from output import run_alvie
 from utils import get_alvie_code_path
+from banner import print_banner
 
 
 def run_non_interactive(argv: list[str]) -> None:
@@ -55,7 +56,7 @@ def run_non_interactive(argv: list[str]) -> None:
 
 
 def run_interactive() -> None:
-    print("\nWelcome to the Alvie CLI!\n")
+    print_banner()
 
     while True:
         choice = ListPrompt(
