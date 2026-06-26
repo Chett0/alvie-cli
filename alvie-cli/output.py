@@ -123,7 +123,7 @@ def run_alvie(
         alvie_path: Path, 
         executable_name : str,
         args: list[str],
-        std_output : bool = False
+        is_raw_output : bool = False
     ) -> None:
     
     exe = f"{alvie_path}/_build/default/bin/{executable_name}"
@@ -143,8 +143,8 @@ def run_alvie(
     process: subprocess.Popen | None = None
     spinner: Spinner | None = None
     try:
-        if std_output:
-            info("Streaming standard output")
+        if is_raw_output:
+            info("Streaming raw output")
             print()
             process = subprocess.Popen(
                 [exe, *args],

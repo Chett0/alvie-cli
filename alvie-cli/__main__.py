@@ -29,7 +29,7 @@ def run_non_interactive(argv: list[str]) -> None:
         help="Path to a saved command configuration (JSON) to execute",
     )
     parser.add_argument(
-        "-s", "--std-output",
+        "-r", "--raw-output",
         action="store_true",
         help="Stream the raw standard output instead of the parsed/formatted output",
     )
@@ -51,7 +51,7 @@ def run_non_interactive(argv: list[str]) -> None:
         alvie_path=get_alvie_code_path(),
         executable_name=command.executable,
         args=config_command.args,
-        std_output=namespace.std_output,
+        is_raw_output=namespace.raw_output,
     )
 
 
