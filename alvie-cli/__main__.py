@@ -80,10 +80,13 @@ def run_interactive() -> None:
 
 
 def main() -> None:
-    if len(sys.argv) == 1:
-        run_interactive()
-    else:
-        run_non_interactive(sys.argv[1:])
+    try:
+        if len(sys.argv) == 1:
+            run_interactive()
+        else:
+            run_non_interactive(sys.argv[1:])
+    except KeyboardInterrupt:
+        sys.exit(0)
 
 
 if __name__ == "__main__":

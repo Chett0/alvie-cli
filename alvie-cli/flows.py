@@ -10,7 +10,7 @@ HELP_INSTRUCTION = "F1 for help"
 SHOW_INSTRUCTION = "F2 to show"
 
 def create_prompt(prompt_cls, allow_back: bool = True, **kwargs):
-    # TODO add help and show instructions
+    # TODO: add help and show instructions
     if allow_back and "long_instruction" not in kwargs:
         kwargs["long_instruction"] = ESC_INSTRUCTION
 

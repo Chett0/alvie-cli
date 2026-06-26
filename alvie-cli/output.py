@@ -142,6 +142,7 @@ def run_alvie(
 
     process: subprocess.Popen | None = None
     spinner: Spinner | None = None
+    
     try:
         if is_raw_output:
             info("Streaming raw output")
@@ -149,8 +150,10 @@ def run_alvie(
             process = subprocess.Popen(
                 [exe, *args],
                 cwd=alvie_path,
+                stderr=subprocess.PIPE,
+                text=True
             )
-            process.wait()
+            process.wait()            
             print("\n")
             if process.returncode != 0:
                 raise subprocess.CalledProcessError(process.returncode, exe)
@@ -197,29 +200,49 @@ def run_alvie(
     except KeyboardInterrupt:
         if spinner:
             spinner.stop()
-        _terminate(process)
+        
+        _terminate(process, force=True) # ctrl+c sends SIGKILL to the process        
+            
+        # if process and process.stderr:
+        #     try:
+        #         process.stderr.close()
+        #     except:
+        #         pass
+            
         print()
         warn("Execution interrupted by user.\n")
     except subprocess.CalledProcessError as exc:
         if spinner:
             spinner.stop()
-        error(f"Alvie exited with a non-zero status ({exc.returncode}).")
-        raise
+            
+        error(f"Alvie exited with a non-zero status ({exc.returncode}).\n")
 
+        # print legitimate error messages from Alvie's stderr
+        if process and process.stderr:
+            try:
+                stderr_output = process.stderr.read()
+                if stderr_output:
+                    print(stderr_output)
+            except:
+                pass
 
-def _terminate(process: subprocess.Popen | None) -> None:
+def _terminate(process: subprocess.Popen | None, force: bool = False) -> None:
     """Stop a running Alvie process, escalating to a kill if it does not exit."""
     if process is None or process.poll() is not None:
         return
-
-    info("Stopping Alvie...")
-    process.terminate()
-    try:
-        process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        warn("Alvie did not stop in time, forcing termination.\n")
+    
+    if force:
+        # ctr+c sends SIGKILL to the process
         process.kill()
-        process.wait()
+    else:
+        # graceful stutdown with SIGTERM, then escalate to SIGKILL if it does not exit
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            warn("Alvie did not stop in time, forcing termination.\n")
+            process.kill()
+            process.wait()
 
 
 def print_alvie_output(raw_res : str):

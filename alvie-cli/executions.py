@@ -225,7 +225,7 @@ def execute_alvie(state: CommandState) -> StepOutput:
     std_output: bool = create_prompt(
             ConfirmPrompt,
             allow_back=True,
-            message="Do you want to see the standard output of the command?",
+            message="Do you want to see the standard raw output of the command?",
             default=True,
         ).execute()
 
@@ -236,7 +236,7 @@ def execute_alvie(state: CommandState) -> StepOutput:
         alvie_path=ALVIE_PATH, 
         executable_name=state.executable, 
         args=state.args,
-        std_output=std_output
+        is_raw_output=std_output
     )
 
     return StepOutput.next()
