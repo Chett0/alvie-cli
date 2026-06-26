@@ -24,7 +24,7 @@ COPY requirements.txt .
 
 RUN uv pip install -r requirements.txt
 
-COPY . .
+COPY --chown=alvie:alvie . .
 
 USER alvie
 

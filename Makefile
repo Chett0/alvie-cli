@@ -16,7 +16,7 @@ rebuild:
 	docker compose build --no-cache
 
 run:
-	docker compose run --rm $(SERVICE)
+	docker compose run --rm -it $(SERVICE)
 
 
 compose: compose-up exec
@@ -41,4 +41,4 @@ compose-restart:
 	docker compose restart $(SERVICE)
 
 exec:
-	docker compose exec $(SERVICE) /bin/bash --rcfile $(VENV_ACTIVATE)
+	docker compose exec -it $(SERVICE) /bin/bash --rcfile $(VENV_ACTIVATE)

@@ -112,7 +112,8 @@
     },
     "--sexp-input": {
         "type": "filename",
-        "description": "Symbolic expression representing the raw input for the simulator"
+        "description": "Symbolic expression representing the raw input for the simulator",
+        "required": true
     },
     "--commit": {
         "type": "hash",
