@@ -222,21 +222,33 @@ def execute_alvie(state: CommandState) -> StepOutput:
     if not state.executable:
         return StepOutput.back()
 
-    std_output: bool = create_prompt(
+    raw_output: bool = create_prompt(
             ConfirmPrompt,
             allow_back=True,
             message="Do you want to see the standard raw output of the command?",
-            default=True,
+            default=False,
         ).execute()
+    
+    json_output_path = None
+    if not raw_output:
+        json_output_path = validate_save_path(
+            message="Where do you want to save parsed output JSON?",
+            default_path="/home/alvie/alvie-cli/parsed-output/parsed_output.json",
+            validator=FileExtensionValidator(
+                expected_extension=".json",
+                must_exists=False
+            )
+        )
 
-    if std_output is StepResult.BACK:
+    if raw_output is StepResult.BACK:
         return StepOutput.back()
 
     run_alvie(
         alvie_path=ALVIE_PATH, 
         executable_name=state.executable, 
         args=state.args,
-        is_raw_output=std_output
+        is_raw_output=raw_output,
+        json_output_path=json_output_path
     )
 
     return StepOutput.next()
