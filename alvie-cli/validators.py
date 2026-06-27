@@ -28,17 +28,24 @@ class FileExtensionValidator(Validator):
             ) 
         
     @classmethod
-    def attacker_file_validator(cls : type["FileExtensionValidator"]) -> "FileExtensionValidator":
+    def attacker_file_validator(cls : type["FileExtensionValidator"], must_exists: bool = False) -> "FileExtensionValidator":
         return cls(
             expected_extension=".atdl",
-            must_exists=False
+            must_exists=must_exists
         )
     
     @classmethod
-    def enclave_file_validator(cls : type["FileExtensionValidator"]) -> "FileExtensionValidator":
+    def enclave_file_validator(cls : type["FileExtensionValidator"], must_exists: bool = False) -> "FileExtensionValidator":
         return cls(
             expected_extension=".etdl",
-            must_exists=False
+            must_exists=must_exists
+        )
+
+    @classmethod
+    def json_file_validator(cls : type["FileExtensionValidator"], must_exists: bool = False) -> "FileExtensionValidator":
+        return cls(
+            expected_extension=".json",
+            must_exists=must_exists
         )
 
 

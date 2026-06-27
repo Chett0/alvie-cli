@@ -4,8 +4,11 @@ from pathlib import Path
 
 from InquirerPy.prompts.list import ListPrompt
 from InquirerPy.base.control import Choice
+from prompt_toolkit.document import Document
+from prompt_toolkit.validation import ValidationError
 
 from entities import Entity, build_entity
+from validators import FileExtensionValidator
 from executions import (
     execute,
     build_commands,
@@ -15,6 +18,15 @@ from executions import (
 from output import run_alvie
 from utils import get_alvie_code_path
 from banner import print_banner
+
+
+def json_output_path(value: str) -> Path:
+    """Validate a JSON output"""
+    try:
+        FileExtensionValidator.json_file_validator().validate(Document(value))
+    except ValidationError as error:
+        raise argparse.ArgumentTypeError(error.message)
+    return Path(value)
 
 
 def run_non_interactive(argv: list[str]) -> None:
@@ -32,6 +44,12 @@ def run_non_interactive(argv: list[str]) -> None:
         "-r", "--raw-output",
         action="store_true",
         help="Stream the raw standard output instead of the parsed/formatted output",
+    )
+    parser.add_argument(
+        "-o", "--output",
+        default=None,
+        type=json_output_path,
+        help="Path to a json file where the output will be saved (default: stdout)",
     )
     namespace = parser.parse_args(argv)
 
@@ -52,6 +70,7 @@ def run_non_interactive(argv: list[str]) -> None:
         executable_name=command.executable,
         args=config_command.args,
         is_raw_output=namespace.raw_output,
+        json_output_path=namespace.output
     )
 
 

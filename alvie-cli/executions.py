@@ -176,10 +176,7 @@ def select_config(state: CommandState) -> StepOutput:
             FilePathPrompt,
             message="Select the configuration file for the command:",
             default="/home/alvie/alvie-cli/presets/config.json",
-            validate=FileExtensionValidator(
-                expected_extension=".json",
-                must_exists=True
-            )
+            validate=FileExtensionValidator.json_file_validator(must_exists=True),
         ).execute()
 
     if file is StepResult.BACK:
@@ -234,10 +231,7 @@ def execute_alvie(state: CommandState) -> StepOutput:
         json_output_path = validate_save_path(
             message="Where do you want to save parsed output JSON?",
             default_path="/home/alvie/alvie-cli/parsed-output/parsed_output.json",
-            validator=FileExtensionValidator(
-                expected_extension=".json",
-                must_exists=False
-            )
+            validator=FileExtensionValidator.json_file_validator()
         )
 
     if raw_output is StepResult.BACK:
@@ -302,10 +296,7 @@ def select_dump_path(state: CommandState) -> StepOutput:
     config_path = validate_save_path(
         message="Select the path where to save the configuration:",
         default_path=f"{WORKING_PATH}/presets/config.json",
-        validator=FileExtensionValidator(
-            expected_extension=".json",
-            must_exists=False
-        )
+        validator=FileExtensionValidator.json_file_validator()
     )
     
     if config_path:

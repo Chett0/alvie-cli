@@ -191,11 +191,12 @@ mode and executes the corresponding command directly. This is useful for scripti
 or for re-running a previously saved configuration.
 
 ```bash
-python alvie-cli <config-file> [-r | --raw-output]
+python alvie-cli <config-file> [-r | --raw-output] [-o | --output <output-file>]
 ```
 
 - `<config-file>`: path to a saved command configuration (JSON).
 - `-r`, `--raw-output`: stream the raw standard output instead of the parsed/formatted output.
+- `-o`, `--output`: path to a JSON file where the output will be saved (default: stdout).
 
 The configuration file uses the same format produced by the interactive mode when
 saving a command. It contains the command `name`, its `executable` and the list of
@@ -217,5 +218,5 @@ saving a command. It contains the command `name`, its `executable` and the list 
 Assuming the file above is saved as `presets/config.json`, run it with:
 
 ```bash
-python alvie-cli presets/config.json -r
+python alvie-cli presets/config.json -r -o /path/to/output.json
 ```
