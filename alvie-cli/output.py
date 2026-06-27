@@ -1,8 +1,10 @@
+from datetime import datetime
 import os
 import sys
 import json
 import threading
 import subprocess
+from dataclasses import dataclass, field
 from pathlib import Path
 from collections import Counter
 import re
@@ -17,6 +19,40 @@ GREEN = "\033[32m"
 YELLOW = "\033[33m"
 RED = "\033[31m"
 CYAN = "\033[38;2;110;230;220m"
+
+SGR_TO_COLOR : dict[str, str] = {
+    "31": "red",
+    "32": "green",
+    "33": "yellow",
+    "34": "blue",
+    "35": "magenta",
+    "91": "red",
+    "92": "green",
+    "93": "yellow",
+    "94": "blue",
+    "95": "magenta",
+}
+
+ACTORS : dict[str, str] = {
+    "blue": "Attacker",
+    "green": "Enclave",
+    "yellow": "No actor",
+    "magenta": "Interrupt",
+    "red": "Reset",
+}
+
+RUN_SEPARATOR_RE = re.compile(r"\x1b\[1;33m.")
+COLOR_SEPARATOR_RE = re.compile(r"\x1b\[([0-9;]*)m|([^\x1b]+)", re.DOTALL)
+
+
+def color_from_sgr(sgr_code: str) -> str | None:
+    """Return the semantic color from a plain or styled ANSI SGR code."""
+    for code in reversed(sgr_code.split(";")):
+        color = SGR_TO_COLOR.get(code)
+        if color:
+            return color
+
+    return None
 
 
 def _supports_color() -> bool:
@@ -96,168 +132,213 @@ class Spinner:
     def __exit__(self, *_exc) -> None:
         self.stop()
 
-SGR_TO_COLOR : dict[str, str] = {
-    "31": "red",
-    "32": "green",
-    "33": "yellow",
-    "34": "blue",
-    "35": "magenta",
-    "91": "red",
-    "92": "green",
-    "93": "yellow",
-    "94": "blue",
-    "95": "magenta",
-}
 
-ACTORS : dict[str, str] = {
-    "blue": "Attacker",
-    "green": "Enclave",
-    "yellow": "No actor",
-    "magenta": "Interrupt",
-    "red": "Reset",
-}
+@dataclass
+class AlvieExecution:
+    """A single ALVIE execution with its arguments and output settings."""
 
-RUN_SEPARATOR_RE = re.compile(r"\x1b\[1;33m.")
-COLOR_SEPARATOR_RE = re.compile(r"\x1b\[([0-9;]*)m|([^\x1b]+)", re.DOTALL)
+    alvie_path: Path
+    executable: str
+    args: list[str] = field(default_factory=list)
+    is_raw_output: bool = False
+    json_output_path: Path | None = None
 
+    _process: subprocess.Popen | None = field(default=None, init=False, repr=False)
+    _spinner: "Spinner | None" = field(default=None, init=False, repr=False)
 
-def color_from_sgr(sgr_code: str) -> str | None:
-    """Return the semantic color from a plain or styled ANSI SGR code."""
-    for code in reversed(sgr_code.split(";")):
-        color = SGR_TO_COLOR.get(code)
-        if color:
-            return color
+    _start_time : datetime | None = field(default=None, init=False, repr=False)
+    _end_time : datetime | None = field(default=None, init=False, repr=False)
 
-    return None
+    @property
+    def exe(self) -> str:
+        """Absolute path to the ALVIE executable to invoke."""
+        return f"{self.alvie_path}/_build/default/bin/{self.executable}"
 
-def run_alvie(
-        alvie_path: Path, 
-        executable_name : str,
-        args: list[str],
-        is_raw_output : bool = False,
-        json_output_path: Path | None = None
-    ) -> None:
-    
-    exe = f"{alvie_path}/_build/default/bin/{executable_name}"
+    @property
+    def command(self) -> list[str]:
+        """Full command line passed to the subprocess."""
+        return [self.exe, *self.args]
 
-    print()
-    info(f"Running {_style(executable_name, CYAN, BOLD)}")
-    hint(f"  {exe}\n")
-    if args:
-        info("Arguments:")
-        for i in range(len(args)//2):
-            print(f"\t{_style(args[2*i], CYAN)}: {args[2*i+1]}")
-    else:
-        hint("  (no arguments)")
-    hint("\nPress Ctrl+C to stop the execution.")
-    print()
+    def arg_pairs(self) -> list[tuple[str, str]]:
+        """Return the arguments grouped as (flag, value) pairs."""
+        return [
+            (self.args[2 * i], self.args[2 * i + 1])
+            for i in range(len(self.args) // 2)
+        ]
 
-    process: subprocess.Popen | None = None
-    spinner: Spinner | None = None
-    
-    try:
-        if is_raw_output:
-            info("Streaming raw output")
-            print()
-            process = subprocess.Popen(
-                [exe, *args],
-                cwd=alvie_path,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-            process.wait()            
-            print("\n")
-            if process.returncode != 0:
-                raise subprocess.CalledProcessError(process.returncode, exe)
-        else:
-            process = subprocess.Popen(
-                [exe, *args],
-                cwd=alvie_path,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
+    def run(self) -> None:
+        """Start the ALVIE process"""
+        self._print_header()
 
-            symbols = load_output_symbols()
-            input_symbols, output_symbols = symbols["inputs"], symbols["outputs"]
-            output_counts: Counter[str] = Counter()
-            parsed_hypotheses: list[ParsedHypothesis] = []
+        self._process = None
+        self._spinner = None
 
-            raw_output = process.stdout
-            if not raw_output:
-                raise RuntimeError("No output from Alvie process.")
+        try:
+            self._start_time = datetime.now()
 
-            spinner = Spinner("Waiting for Alvie to produce hypotheses").start()
-
-            for i, line in enumerate(raw_output):
-                if line.strip():
-                    spinner.stop()
-                    print(f"Hypothesis {i+1}\n")
-                    hypothesis = parse_hypothesis(
-                        raw_hypothesis=line.strip(),
-                        input_symbols=input_symbols,
-                        output_symbols=output_symbols,
-                        output_counts=output_counts,
-                    )
-                    parsed_hypotheses.append(hypothesis)
-                    print(format_hypothesis(hypothesis), flush=True)
-                    spinner = Spinner("Waiting for the next hypothesis").start()
-
-            spinner.stop()
-            process.wait()
-            if process.returncode != 0:
-                raise subprocess.CalledProcessError(process.returncode, exe)
-
-            print_recap(output_symbols, output_counts)
-            save_parsed_output(json_output_path, parsed_hypotheses, output_counts)
-
-        success("Alvie finished successfully.\n")
-    except KeyboardInterrupt:
-        if spinner:
-            spinner.stop()
+            if self.is_raw_output:
+                self._run_raw()
+            else:
+                self._run_parsed()
+            success("Alvie finished successfully.\n")
         
-        _terminate(process, force=True) # ctrl+c sends SIGKILL to the process        
-            
-        # if process and process.stderr:
-        #     try:
-        #         process.stderr.close()
-        #     except:
-        #         pass
-            
-        print()
-        warn("Execution interrupted by user.\n")
-    except subprocess.CalledProcessError as exc:
-        if spinner:
-            spinner.stop()
-            
-        error(f"Alvie exited with a non-zero status ({exc.returncode}).\n")
+        except KeyboardInterrupt:
+            self._stop_spinner()
+            self._terminate(force=True)  # ctrl+c sends SIGKILL to the process
+            print()
+            warn("Execution interrupted by user.\n")
 
-        # print legitimate error messages from Alvie's stderr
+        except subprocess.CalledProcessError as exc:
+            self._stop_spinner()
+            error(f"Alvie exited with a non-zero status ({exc.returncode}).\n")
+            self._print_stderr()  # print legitimate error messages from Alvie's stderr
+
+    def _print_header(self) -> None:
+        print()
+        info(f"Running {_style(self.executable, CYAN, BOLD)}")
+        hint(f"  {self.exe}\n")
+        if self.args:
+            info("Arguments:")
+            for flag, value in self.arg_pairs():
+                print(f"\t{_style(flag, CYAN)}: {value}")
+        else:
+            hint("  (no arguments)")
+        hint("\nPress Ctrl+C to stop the execution.")
+        print()
+
+    def _run_raw(self) -> None:
+        info("Streaming raw output")
+        print()
+        self._process = subprocess.Popen(
+            self.command,
+            cwd=self.alvie_path,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        self._process.wait()
+        self._end_time = datetime.now()
+
+        print("\n")
+        if self._process.returncode != 0:
+            raise subprocess.CalledProcessError(self._process.returncode, self.exe)
+
+    def _run_parsed(self) -> None:
+        self._process = subprocess.Popen(
+            self.command,
+            cwd=self.alvie_path,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        symbols = load_output_symbols()
+        input_symbols, output_symbols = symbols["inputs"], symbols["outputs"]
+        output_counts: Counter[str] = Counter()
+        parsed_hypotheses: list[ParsedHypothesis] = []
+
+        raw_output = self._process.stdout
+        if not raw_output:
+            raise RuntimeError("No output from Alvie process.")
+
+        self._spinner = Spinner("Waiting for Alvie to produce hypotheses").start()
+
+        for i, line in enumerate(raw_output):
+            if line.strip():
+                self._stop_spinner()
+                print(f"Hypothesis {i+1}\n")
+                hypothesis = parse_hypothesis(
+                    raw_hypothesis=line.strip(),
+                    input_symbols=input_symbols,
+                    output_symbols=output_symbols,
+                    output_counts=output_counts,
+                )
+                parsed_hypotheses.append(hypothesis)
+                print(format_hypothesis(hypothesis), flush=True)
+                self._spinner = Spinner("Waiting for the next hypothesis").start()
+
+        self._stop_spinner()
+        self._process.wait()
+        self._end_time = datetime.now()
+
+        if self._process.returncode != 0:
+            raise subprocess.CalledProcessError(self._process.returncode, self.exe)
+
+        print_recap(output_symbols, output_counts)
+        self._save_parsed_output(parsed_hypotheses, output_counts)
+
+    def _stop_spinner(self) -> None:
+        if self._spinner:
+            self._spinner.stop()
+            self._spinner = None
+
+    def _terminate(self, force: bool = False) -> None:
+        """Stop the running Alvie process, escalating to a kill if it does not exit."""
+        process = self._process
+        if process is None or process.poll() is not None:
+            return
+
+        if force:
+            # ctrl+c sends SIGKILL to the process
+            process.kill()
+        else:
+            # graceful shutdown with SIGTERM, then escalate to SIGKILL if it does not exit
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                warn("Alvie did not stop in time, forcing termination.\n")
+                process.kill()
+                process.wait()
+
+    def _print_stderr(self) -> None:
+        process = self._process
         if process and process.stderr:
             try:
                 stderr_output = process.stderr.read()
                 if stderr_output:
                     print(stderr_output)
-            except:
+            except OSError:
                 pass
 
-def _terminate(process: subprocess.Popen | None, force: bool = False) -> None:
-    """Stop a running Alvie process, escalating to a kill if it does not exit."""
-    if process is None or process.poll() is not None:
-        return
-    
-    if force:
-        # ctr+c sends SIGKILL to the process
-        process.kill()
-    else:
-        # graceful stutdown with SIGTERM, then escalate to SIGKILL if it does not exit
-        process.terminate()
+    def _save_parsed_output(
+        self,
+        hypotheses: list[ParsedHypothesis],
+        output_counts: Counter[str],
+    ) -> None:
+        """Save parsed output as JSON when an output path is provided."""
+        if not self.json_output_path:
+            return
+
+        output_data = self._build_output_json(hypotheses, output_counts)
+
         try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            warn("Alvie did not stop in time, forcing termination.\n")
-            process.kill()
-            process.wait()
+            self.json_output_path.parent.mkdir(parents=True, exist_ok=True)
+            with self.json_output_path.open("w", encoding="utf-8") as file:
+                json.dump(output_data, file, ensure_ascii=False, indent=2)
+                file.write("\n")
+            info(f"Parsed output saved to {_style(str(self.json_output_path), CYAN, BOLD)}\n")
+        except OSError as exc:
+            warn(f"Could not save parsed output JSON: {exc}\n")
+
+    def _build_output_json(
+        self,
+        hypotheses: list[ParsedHypothesis],
+        output_counts: Counter[str],
+    ) -> dict:
+        """Build the JSON-serializable parsed output document."""
+        return {
+            "executable": self.executable,
+            "args": self.args,
+            "start": self._start_time.isoformat() if self._start_time else None,
+            "end": self._end_time.isoformat() if self._end_time else None,
+            "recap": {
+                symbol: count
+                for symbol, count in output_counts.items()
+                if count > 0
+            },
+            "hypotheses": [hypothesis.to_dict() for hypothesis in hypotheses],
+        }
+
 
 
 def print_alvie_output(raw_res : str):
@@ -293,47 +374,6 @@ def print_recap(
         print(f"\t{data['name']} ({symbol}): {output_counts[symbol]}") 
 
     print()  
-
-
-def save_parsed_output(
-        output_path: Path | None,
-        hypotheses: list[ParsedHypothesis],
-        output_counts: Counter[str],
-) -> None:
-    """Save parsed output as JSON when an output path is provided."""
-    if not output_path:
-        return
-
-    output_data = build_output_json(hypotheses, output_counts)
-
-    try:
-        write_output_json(output_data, output_path)
-        info(f"Parsed output saved to {_style(str(output_path), CYAN, BOLD)}\n")
-    except OSError as exc:
-        warn(f"Could not save parsed output JSON: {exc}\n")
-
-
-def build_output_json(
-        hypotheses: list[ParsedHypothesis],
-        output_counts: Counter[str],
-) -> dict:
-    """Build the JSON-serializable parsed output document."""
-    return {
-        "hypotheses": [hypothesis.to_dict() for hypothesis in hypotheses],
-        "recap": {
-            symbol: count
-            for symbol, count in output_counts.items()
-            if count > 0
-        },
-    }
-
-
-def write_output_json(output_data: dict, output_path: Path) -> None:
-    """Write parsed output JSON, creating parent directories if needed."""
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("w", encoding="utf-8") as file:
-        json.dump(output_data, file, ensure_ascii=False, indent=2)
-        file.write("\n")
 
 
 def parse_hypothesis(

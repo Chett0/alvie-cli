@@ -12,7 +12,7 @@ from prompt_toolkit.validation import ValidationError
 
 from commands import Command, Argument, ConfigCommand
 from utils import DONE_CHOICE, get_alvie_code_path, is_done, load_args, load_commands, validate_save_path
-from output import run_alvie
+from output import AlvieExecution
 from entities import build_choices
 from validators import FileExtensionValidator
 from flows import Flow, StepOutput, StepResult, CommandState, create_prompt
@@ -237,13 +237,13 @@ def execute_alvie(state: CommandState) -> StepOutput:
     if raw_output is StepResult.BACK:
         return StepOutput.back()
 
-    run_alvie(
-        alvie_path=ALVIE_PATH, 
-        executable_name=state.executable, 
+    AlvieExecution(
+        alvie_path=ALVIE_PATH,
+        executable=state.executable,
         args=state.args,
         is_raw_output=raw_output,
-        json_output_path=json_output_path
-    )
+        json_output_path=json_output_path,
+    ).run()
 
     return StepOutput.next()
 

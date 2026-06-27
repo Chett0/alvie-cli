@@ -15,7 +15,7 @@ from executions import (
     get_config_command,
     validate_config_command,
 )
-from output import run_alvie
+from output import AlvieExecution
 from utils import get_alvie_code_path
 from banner import print_banner
 
@@ -47,12 +47,31 @@ def run_non_interactive(argv: list[str]) -> None:
         action="store_true",
         help="Stream the raw standard output instead of the parsed/formatted output",
     )
+    # Mapping outputs to multiple configurations.
+    #
+    # The current implementation accepts one path per configuration and pairs `-o out1.json out2.json ...`
+    # them positionally (configs[i] -> output[i]). It is validated below so the
+    # number of paths must match the number of configs, and each is passed to the
+    # matching AlvieExecution as `json_output_path`.
+    #
+    # Alternatives considered (not implemented):
+    #   1) Output directory + derived names: `-o DIR`, each file named after the
+    #      config stem (e.g. <config>.json). Scales to any N and is race-free under
+    #      parallel runs, but same-stem configs collide and it needs a directory check.
+    #   2) Single aggregated JSON: one `-o results.json` collecting every run into one
+    #      document keyed by config. Great for comparing configs, but executions must
+    #      return their document and the caller writes once (collect-then-write under
+    #      --njobs).
+    #   3) Filename template: `-o "out/{name}_{index}.json"` with placeholders
+    #      substituted per execution. Most flexible from one argument, but more surface
+    #      to document and validate.
     parser.add_argument(
         "-o", "--output",
-        # nargs="+" #TODO handle multiple outputs file for multiple configurations,
+        nargs="+",
         default=None,
         type=json_output_path,
-        help="Path to a json file where the output will be saved (default: stdout)"
+        help="Paths to json files where the output will be saved, one per "
+             "configuration in the same order (default: stdout)"
     )
     parser.add_argument(
         "--njobs",
@@ -68,6 +87,9 @@ def run_non_interactive(argv: list[str]) -> None:
 
     if not namespace.configs:
         parser.error("No configuration files provided")
+    if namespace.output and len(namespace.output) != len(namespace.configs):
+        parser.error("The number of output paths must match the number of configuration files")
+
     config_paths = [Path(config) for config in namespace.configs]
     for config_path in config_paths:
         if not config_path.is_file():
@@ -75,33 +97,28 @@ def run_non_interactive(argv: list[str]) -> None:
 
     build_commands()
 
-    jobs: list[tuple[Path, str, list[str]]] = []
-    for config_path in config_paths:
+    alvie_path = get_alvie_code_path()
+
+    executions: list[AlvieExecution] = []
+    for i, config_path in enumerate(config_paths):
         try:
             config_command = get_config_command(config_path)
             command = validate_config_command(config_command)
         except ValueError as error:
             parser.error(f"{config_path}: {error}")
 
-        jobs.append((
-            config_path, 
-            command.executable, 
-            config_command.args
+        executions.append(AlvieExecution(
+            alvie_path=alvie_path,
+            executable=command.executable,
+            args=config_command.args,
+            is_raw_output=namespace.raw_output,
+            json_output_path=namespace.output[i],
         ))
-
-    alvie_path = get_alvie_code_path()
 
     # sequential execution
     if namespace.njobs == 1:
-        for job in jobs:
-            _, executable, args = job
-            run_alvie(
-                alvie_path=alvie_path,
-                executable_name=executable,
-                args=args,
-                is_raw_output=namespace.raw_output,
-                json_output_path=namespace.output
-            )
+        for execution in executions:
+            execution.run()
     # TODO parallel execution
 
 
