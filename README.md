@@ -186,17 +186,19 @@ For a complete list of available instructions and combinators, please refer to t
 
 #### Non-interactive execution
 
-When a configuration file is passed as an argument, the CLI skips the interactive
-mode and executes the corresponding command directly. This is useful for scripting
-or for re-running a previously saved configuration.
+When one or more configuration files are passed as arguments, the CLI skips the
+interactive mode and executes the corresponding commands directly. This is useful
+for scripting or for re-running previously saved configurations.
 
 ```bash
-python alvie-cli <config-file> [-r | --raw-output] [-o | --output <output-file>]
+python alvie-cli <config-file> [<config-file> ...] [-r | --raw-output] [-o | --output <output-file>] [--njobs <n>]
 ```
 
-- `<config-file>`: path to a saved command configuration (JSON).
+- `<config-file>`: one or more paths to saved command configurations (JSON). When
+  several files are provided they are executed sequentially, unless `--njobs` is specified.
 - `-r`, `--raw-output`: stream the raw standard output instead of the parsed/formatted output.
 - `-o`, `--output`: path to a JSON file where the output will be saved (default: stdout).
+- `--njobs <n>`: number of configurations to run in parallel (default: `1`, i.e. sequential execution).
 
 The configuration file uses the same format produced by the interactive mode when
 saving a command. It contains the command `name`, its `executable` and the list of
@@ -219,4 +221,19 @@ Assuming the file above is saved as `presets/config.json`, run it with:
 
 ```bash
 python alvie-cli presets/config.json -r -o /path/to/output.json
+```
+
+##### Running multiple configurations
+
+You can pass several configuration files at once. By default they run
+sequentially, in the order they are listed on the command line:
+
+```bash
+python alvie-cli presets/learn.json presets/flow-analysis.json presets/pbt.json
+```
+
+Use `--njobs` to run several configurations in parallel:
+
+```bash
+python alvie-cli presets/*.json --njobs 4
 ```

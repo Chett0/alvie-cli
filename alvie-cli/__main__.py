@@ -37,8 +37,10 @@ def run_non_interactive(argv: list[str]) -> None:
                     "or pass a saved configuration file to execute it directly.",
     )
     parser.add_argument(
-        "config",
-        help="Path to a saved command configuration (JSON) to execute",
+        "configs",
+        nargs="+",
+        help="Paths to saved command configurations (JSON) to execute."
+             "Default sequential execution"
     )
     parser.add_argument(
         "-r", "--raw-output",
@@ -47,31 +49,60 @@ def run_non_interactive(argv: list[str]) -> None:
     )
     parser.add_argument(
         "-o", "--output",
+        # nargs="+" #TODO handle multiple outputs file for multiple configurations,
         default=None,
         type=json_output_path,
-        help="Path to a json file where the output will be saved (default: stdout)",
+        help="Path to a json file where the output will be saved (default: stdout)"
     )
+    parser.add_argument(
+        "--njobs",
+        type=int,
+        default=1,
+        help="Number of configurations to run in parallel (default: 1)",
+    )
+
     namespace = parser.parse_args(argv)
 
-    config_path = Path(namespace.config)
-    if not config_path.is_file():
-        parser.error(f"Configuration file not found: {config_path}")
+    if namespace.njobs < 1:
+        parser.error("--njobs must be a positive integer")
+
+    if not namespace.configs:
+        parser.error("No configuration files provided")
+    config_paths = [Path(config) for config in namespace.configs]
+    for config_path in config_paths:
+        if not config_path.is_file():
+            parser.error(f"Configuration file not found: {config_path}")
 
     build_commands()
 
-    try:
-        config_command = get_config_command(config_path)
-        command = validate_config_command(config_command)
-    except ValueError as error:
-        parser.error(str(error))
+    jobs: list[tuple[Path, str, list[str]]] = []
+    for config_path in config_paths:
+        try:
+            config_command = get_config_command(config_path)
+            command = validate_config_command(config_command)
+        except ValueError as error:
+            parser.error(f"{config_path}: {error}")
 
-    run_alvie(
-        alvie_path=get_alvie_code_path(),
-        executable_name=command.executable,
-        args=config_command.args,
-        is_raw_output=namespace.raw_output,
-        json_output_path=namespace.output
-    )
+        jobs.append((
+            config_path, 
+            command.executable, 
+            config_command.args
+        ))
+
+    alvie_path = get_alvie_code_path()
+
+    # sequential execution
+    if namespace.njobs == 1:
+        for job in jobs:
+            _, executable, args = job
+            run_alvie(
+                alvie_path=alvie_path,
+                executable_name=executable,
+                args=args,
+                is_raw_output=namespace.raw_output,
+                json_output_path=namespace.output
+            )
+    # TODO parallel execution
 
 
 def run_interactive() -> None:
