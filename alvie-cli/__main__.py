@@ -70,7 +70,7 @@ def run_non_interactive(argv: list[str]) -> None:
         nargs="+",
         default=None,
         type=json_output_path,
-        help="Paths to json files where the output will be saved, one per "
+        help="Paths to json files where the parsed output will be saved, one per "
              "configuration in the same order (default: stdout)"
     )
     parser.add_argument(
@@ -112,7 +112,7 @@ def run_non_interactive(argv: list[str]) -> None:
             executable=command.executable,
             args=config_command.args,
             is_raw_output=namespace.raw_output,
-            json_output_path=namespace.output[i],
+            json_output_path=namespace.output[i] if namespace.output else None,
         ))
 
     # sequential execution

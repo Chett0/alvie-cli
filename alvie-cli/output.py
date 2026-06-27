@@ -207,18 +207,29 @@ class AlvieExecution:
         print()
 
     def _run_raw(self) -> None:
-        info("Streaming raw output")
-        print()
+        self._spinner = Spinner("Executing ALVIE").start()
         self._process = subprocess.Popen(
             self.command,
             cwd=self.alvie_path,
+            stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
         )
+
+        raw_output = self._process.stdout
+        if not raw_output:
+            raise RuntimeError("No output from Alvie process.")
+
+        stdout_output = raw_output.read()
         self._process.wait()
         self._end_time = datetime.now()
 
+        self._stop_spinner()
+        print()
+        if stdout_output:
+            print(stdout_output)
         print("\n")
+
         if self._process.returncode != 0:
             raise subprocess.CalledProcessError(self._process.returncode, self.exe)
 
