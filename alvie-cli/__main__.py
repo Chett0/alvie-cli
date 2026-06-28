@@ -52,7 +52,7 @@ def run_non_interactive(argv: list[str]) -> None:
     # The current implementation accepts one path per configuration and pairs `-o out1.json out2.json ...`
     # them positionally (configs[i] -> output[i]). It is validated below so the
     # number of paths must match the number of configs, and each is passed to the
-    # matching AlvieExecution as `json_output_path`.
+    # matching AlvieExecution as `parsed_output_path`.
     #
     # Alternatives considered (not implemented):
     #   1) Output directory + derived names: `-o DIR`, each file named after the
@@ -66,12 +66,18 @@ def run_non_interactive(argv: list[str]) -> None:
     #      substituted per execution. Most flexible from one argument, but more surface
     #      to document and validate.
     parser.add_argument(
-        "-o", "--output",
+        "-p", "--parsed-output",
         nargs="+",
         default=None,
         type=json_output_path,
         help="Paths to json files where the parsed output will be saved, one per "
-             "configuration in the same order (default: stdout)"
+             "configuration in the same order"
+    )
+    parser.add_argument(
+        "-o", "--output",
+        default=None,
+        type=Path,
+        help="Path to file where the output will be saved (default: stdout)"
     )
     parser.add_argument(
         "--njobs",
@@ -87,8 +93,8 @@ def run_non_interactive(argv: list[str]) -> None:
 
     if not namespace.configs:
         parser.error("No configuration files provided")
-    if namespace.output and len(namespace.output) != len(namespace.configs):
-        parser.error("The number of output paths must match the number of configuration files")
+    if namespace.parsed_output and len(namespace.parsed_output) != len(namespace.configs):
+        parser.error("The number of parsed-output paths must match the number of configuration files")
 
     config_paths = [Path(config) for config in namespace.configs]
     for config_path in config_paths:
@@ -112,7 +118,8 @@ def run_non_interactive(argv: list[str]) -> None:
             executable=command.executable,
             args=config_command.args,
             is_raw_output=namespace.raw_output,
-            json_output_path=namespace.output[i] if namespace.output else None,
+            output_path=namespace.output,
+            parsed_output_path=namespace.parsed_output[i] if namespace.parsed_output else None,
         ))
 
     # sequential execution

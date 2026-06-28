@@ -228,16 +228,16 @@ def select_output_mode(state: CommandState) -> StepOutput:
     
 
 def select_json_output_path(state: CommandState) -> StepOutput:
-    json_output_path : Path | None = validate_save_path(
+    parsed_output_path : Path | None = validate_save_path(
         message="Where do you want to save parsed output JSON?",
         default_path="/home/alvie/alvie-cli/parsed-output/parsed_output.json",
         validator=FileExtensionValidator.json_file_validator()
     )
 
-    if json_output_path is StepResult.BACK:
+    if parsed_output_path is StepResult.BACK:
         return StepOutput.back()
 
-    state.json_output_path = json_output_path
+    state.parsed_output_path = parsed_output_path
     return StepOutput.next(next_step="execute_alvie")
 
 
@@ -250,7 +250,7 @@ def execute_alvie(state: CommandState) -> StepOutput:
         executable=state.executable,
         args=state.args,
         is_raw_output=state.raw_output,
-        json_output_path=state.json_output_path,
+        parsed_output_path=state.parsed_output_path,
     ).run()
 
     return StepOutput.next()

@@ -191,13 +191,19 @@ interactive mode and executes the corresponding commands directly. This is usefu
 for scripting or for re-running previously saved configurations.
 
 ```bash
-python alvie-cli <config-file> [<config-file> ...] [-r | --raw-output] [-o | --output <output-file>] [--njobs <n>]
+python alvie-cli <config-file> [<config-file> ...] [-r | --raw-output] [-o | --output <output-file>] [-p | --parsed-output <json-file> ...] [--njobs <n>]
 ```
 
 - `<config-file>`: one or more paths to saved command configurations (JSON). When
   several files are provided they are executed sequentially, unless `--njobs` is specified.
 - `-r`, `--raw-output`: stream the raw standard output instead of the parsed/formatted output.
-- `-o`, `--output`: path to a JSON file where the output will be saved (default: stdout).
+- `-o`, `--output`: path to a single file where the alvie output (the
+  parsed/formatted hypotheses, or the raw output with `-r`) is written instead of
+  the terminal (default: stdout).
+- `-p`, `--parsed-output`: one or more paths to JSON files where the structured
+  parsed output is saved, one path per configuration in the same order they are
+  listed. The JSON document contains the executable, its arguments, the start/end
+  timestamps, a recap of the output symbols and the parsed hypotheses.
 - `--njobs <n>`: number of configurations to run in parallel (default: `1`, i.e. sequential execution).
 
 The configuration file uses the same format produced by the interactive mode when
@@ -220,7 +226,7 @@ saving a command. It contains the command `name`, its `executable` and the list 
 Assuming the file above is saved as `presets/config.json`, run it with:
 
 ```bash
-python alvie-cli presets/config.json -r -o /path/to/output.json
+python alvie-cli presets/config.json -r -o /path/to/output.txt -p /path/to/parsed.json
 ```
 
 ##### Running multiple configurations

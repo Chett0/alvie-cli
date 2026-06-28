@@ -1,4 +1,5 @@
 from datetime import datetime
+from io import TextIOWrapper
 import os
 import sys
 import json
@@ -141,11 +142,13 @@ class AlvieExecution:
     alvie_path: Path
     executable: str
     args: list[ConfigArg] = field(default_factory=list)
-    is_raw_output: bool = False
-    json_output_path: Path | None = None
+    is_raw_output: bool = field(default=False)
+    output_path: Path | None = field(default=None)
+    parsed_output_path: Path | None = field(default=None)
 
     _process: subprocess.Popen | None = field(default=None, init=False, repr=False)
-    _spinner: "Spinner | None" = field(default=None, init=False, repr=False)
+    _spinner: Spinner | None = field(default=None, init=False, repr=False)
+    _output_file: TextIOWrapper | None = field(default=None, init=False, repr=False)
 
     _start_time : datetime | None = field(default=None, init=False, repr=False)
     _end_time : datetime | None = field(default=None, init=False, repr=False)
@@ -176,16 +179,18 @@ class AlvieExecution:
 
         self._process = None
         self._spinner = None
+        self._open_output_file()
 
         try:
             self._start_time = datetime.now()
+            self._write_header()
 
             if self.is_raw_output:
                 self._run_raw()
             else:
                 self._run_parsed()
-            success("Alvie finished successfully.\n")
-        
+            success("\nAlvie finished successfully.\n")
+
         except KeyboardInterrupt:
             self._stop_spinner()
             self._terminate(force=True)  # ctrl+c sends SIGKILL to the process
@@ -196,6 +201,89 @@ class AlvieExecution:
             self._stop_spinner()
             error(f"Alvie exited with a non-zero status ({exc.returncode}).\n")
             self._print_stderr()  # print legitimate error messages from Alvie's stderr
+
+        finally:
+            self._close_output_file()
+
+    def _open_output_file(self) -> None:
+        """Open the output file for writing when an output path is provided."""
+        self._output_file = None
+        if not self.output_path:
+            return
+        try:
+            self.output_path.parent.mkdir(parents=True, exist_ok=True)
+            self._output_file = self.output_path.open("w", encoding="utf-8")
+        except OSError as exc:
+            warn(f"Could not open output file, writing to terminal instead: {exc}\n")
+            self._output_file = None
+
+    def _close_output_file(self) -> None:
+        """Close the output file"""
+        if not self._output_file:
+            return
+        self._write_footer()
+        self._output_file.close()
+        self._output_file = None
+        info(f"Output saved to {_style(str(self.output_path), CYAN, BOLD)}\n")
+
+    def _write_header(self) -> None:
+        """Write a header with execution information to the output file."""
+        if not self._output_file:
+            return
+
+        started = (
+            self._start_time.isoformat(sep=" ", timespec="seconds")
+            if self._start_time else "unknown"
+        )
+
+        lines = [
+            "=" * 60,
+            "Start of ALVIE execution",
+            f"Executable : {self.executable}",
+            f"Path       : {self.exe}",
+            f"Output mode       : {'raw' if self.is_raw_output else 'parsed'}",
+            f"Started    : {started}",
+            "Arguments  :",
+        ]
+        if self.args:
+            for arg in self.args:
+                if arg.value is not None:
+                    lines.append(f"  {arg.flag}: {arg.value}")
+                else:
+                    lines.append(f"  {arg.flag}")
+        else:
+            lines.append("  (no arguments)")
+        lines.append("=" * 60)
+
+        self._write("\n".join(lines) + "\n")
+
+    def _write_footer(self) -> None:
+        """Write a footer with execution timing to the output file."""
+        if not self._output_file:
+            return
+
+        ended = (
+            self._end_time.isoformat(sep=" ", timespec="seconds")
+            if self._end_time else "unknown"
+        )
+
+        lines = [
+            "=" * 60,
+            "End of ALVIE execution",
+            f"Finished   : {ended}",
+        ]
+        if self._start_time and self._end_time:
+            lines.append(f"Duration   : {self._end_time - self._start_time}")
+        lines.append("=" * 60)
+
+        self._write("\n".join(lines) + "\n")
+
+    def _write(self, text: str = "", end: str = "\n", flush: bool = False) -> None:
+        """Write produced output to the output file when set, otherwise to the terminal."""
+        if self._output_file:
+            self._output_file.write(f"{text}{end}")
+        else:
+            print(text, end=end, flush=flush)
 
     def _print_header(self) -> None:
         print()
@@ -232,10 +320,8 @@ class AlvieExecution:
         self._end_time = datetime.now()
 
         self._stop_spinner()
-        print()
         if stdout_output:
-            print(stdout_output)
-        print("\n")
+            self._write(stdout_output)
 
         if self._process.returncode != 0:
             raise subprocess.CalledProcessError(self._process.returncode, self.exe)
@@ -263,7 +349,7 @@ class AlvieExecution:
         for i, line in enumerate(raw_output):
             if line.strip():
                 self._stop_spinner()
-                print(f"Hypothesis {i+1}\n")
+                self._write()
                 hypothesis = parse_hypothesis(
                     raw_hypothesis=line.strip(),
                     input_symbols=input_symbols,
@@ -271,8 +357,9 @@ class AlvieExecution:
                     output_counts=output_counts,
                 )
                 parsed_hypotheses.append(hypothesis)
-                print(format_hypothesis(hypothesis), flush=True)
-                self._spinner = Spinner("Waiting for the next hypothesis").start()
+                formatted_hypothesis = format_hypothesis(hypothesis)
+                self._write(f"Hypothesis {i+1}\n", formatted_hypothesis, flush=True)
+                self._spinner = Spinner(f"Waiting for the next hypothesis {i+2}").start()
 
         self._stop_spinner()
         self._process.wait()
@@ -281,7 +368,7 @@ class AlvieExecution:
         if self._process.returncode != 0:
             raise subprocess.CalledProcessError(self._process.returncode, self.exe)
 
-        print_recap(output_symbols, output_counts)
+        self._write(format_recap(output_symbols, output_counts))
         self._save_parsed_output(parsed_hypotheses, output_counts)
 
     def _stop_spinner(self) -> None:
@@ -324,17 +411,18 @@ class AlvieExecution:
         output_counts: Counter[str],
     ) -> None:
         """Save parsed output as JSON when an output path is provided."""
-        if not self.json_output_path:
+        if not self.parsed_output_path:
             return
 
         output_data = self._build_output_json(hypotheses, output_counts)
 
         try:
-            self.json_output_path.parent.mkdir(parents=True, exist_ok=True)
-            with self.json_output_path.open("w", encoding="utf-8") as file:
+            self.parsed_output_path.parent.mkdir(parents=True, exist_ok=True)
+            with self.parsed_output_path.open("w", encoding="utf-8") as file:
                 json.dump(output_data, file, ensure_ascii=False, indent=2)
-                file.write("\n")
-            info(f"Parsed output saved to {_style(str(self.json_output_path), CYAN, BOLD)}\n")
+                # file.write("\n")
+                print()
+            info(f"Parsed output saved to {_style(str(self.parsed_output_path), CYAN, BOLD)}\n")
         except OSError as exc:
             warn(f"Could not save parsed output JSON: {exc}\n")
 
@@ -363,40 +451,15 @@ class AlvieExecution:
         }
 
 
-
-def print_alvie_output(raw_res : str):
-    symbols : dict = load_output_symbols()
-    input_symbols, output_symbols = symbols["inputs"], symbols["outputs"]
-    output_counts: Counter[str] = Counter()
-
-    raw_hypotheses : list[str] = raw_res.splitlines()
-
-    for i, raw_hypothesis in enumerate(raw_hypotheses):
-        if raw_hypothesis:
-            print(f"Hypothesis {i+1}\n\n")
-            hypothesis = parse_hypothesis(
-                raw_hypothesis=raw_hypothesis, 
-                input_symbols=input_symbols,
-                output_symbols=output_symbols,
-                output_counts=output_counts,
-            ) 
-            print(format_hypothesis(hypothesis)) 
-            print("\n")
-
-    print_recap(output_symbols, output_counts)
-
-
-def print_recap(
-        output_symbols: dict, 
+def format_recap(
+        output_symbols: dict,
         output_counts: Counter[str]
-) -> None:
-    """Print the total occurrences of each output symbol."""
-    print(f"Recap\n")
-
+) -> str:
+    """Format the total occurrences of each output symbol."""
+    lines = ["Recap\n"]
     for symbol, data in output_symbols.items():
-        print(f"\t{data['name']} ({symbol}): {output_counts[symbol]}") 
-
-    print()  
+        lines.append(f"\t{data['name']} ({symbol}): {output_counts[symbol]}")
+    return "\n".join(lines) + "\n"
 
 
 def parse_hypothesis(

@@ -159,4 +159,4 @@ class CommandState:
     args : list[ConfigArg] = field(default_factory=list)
     executable : str | None = None
     raw_output : bool = True
-    json_output_path : Path | None = None
+    parsed_output_path : Path | None = None
