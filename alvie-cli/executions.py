@@ -15,7 +15,7 @@ from utils import DONE_CHOICE, get_alvie_code_path, is_done, load_args, load_com
 from output import AlvieExecution
 from entities import build_choices
 from validators import FileExtensionValidator
-from flows import Flow, StepOutput, StepResult, CommandState, create_prompt
+from flows import Flow, StepOutput, StepResult, CommandState, ConfigArg, create_prompt
 
 
 ALVIE_PATH = get_alvie_code_path()
@@ -78,32 +78,23 @@ def validate_config_command(config_command: ConfigCommand) -> Command:
     if not command:
         raise ValueError(f"Command {config_command.name} not found in the configuration.")
 
-    pending_arg : Argument | None = None
-    for token in config_command.args:
-        if token.startswith("--"):
-            if pending_arg:
-                raise ValueError(f"Argument {pending_arg.flag} has no value in the configuration.")
+    for arg in config_command.args:
+        command_arg : Argument | None = command.get_arg_by_flag(arg.flag)
+        if not command_arg:
+            raise ValueError(f"Argument {arg.flag} not found in command {config_command.name}.")
 
-            command_arg : Argument | None = command.get_arg_by_flag(token)
-            if not command_arg:
-                raise ValueError(f"Argument {token} not found in command {config_command.name}.")
-
-            pending_arg = command_arg if command_arg.requires_value() else None
-        else:
-            if not pending_arg:
-                raise ValueError(f"Value {token} has no corresponding argument flag in the configuration.")
+        if command_arg.requires_value():
+            if arg.value is None:
+                raise ValueError(f"Argument {arg.flag} has no value in the configuration.")
 
             try:
-                pending_arg.validate_value(token)
+                command_arg.validate_value(arg.value)
             except ValidationError as error:
                 raise ValueError(
-                    f"Validation error for argument {pending_arg.flag}: {error.message}"
+                    f"Validation error for argument {arg.flag}: {error.message}"
                 ) from error
-
-            pending_arg = None
-
-    if pending_arg:
-        raise ValueError(f"Argument {pending_arg.flag} has no value in the configuration.")
+        elif arg.value is not None:
+            raise ValueError(f"Argument {arg.flag} is a flag and must not have a value.")
 
     return command
 
@@ -120,8 +111,8 @@ def select_args(state: CommandState) -> StepOutput:
         print(f"Command {state.name} not found in the configuration.")
         return StepOutput.back()
 
-    chosen_args : list[str] = []
-    
+    chosen_args : list[ConfigArg] = []
+
     required_args : list[Argument] = [arg for arg in command.args if arg.required]
     optional_args : list[Argument] = [arg for arg in command.args if not arg.required]
 
@@ -160,15 +151,15 @@ def select_args(state: CommandState) -> StepOutput:
     return StepOutput.next("select_dump")
 
 
-def collect_arg(arg: Argument, args: list[str]) -> StepResult | None:
+def collect_arg(arg: Argument, args: list[ConfigArg]) -> StepResult | None:
     value = arg.select_value()
     if value is StepResult.BACK:
         return StepResult.BACK
     if isinstance(value, bool):
         if value:
-            args.extend([f"{arg.flag}"])
-    else: 
-        args.extend([f"{arg.flag}", value])
+            args.append(ConfigArg(flag=arg.flag))
+    else:
+        args.append(ConfigArg(flag=arg.flag, value=value))
 
 
 def select_config(state: CommandState) -> StepOutput:
@@ -191,11 +182,14 @@ def select_config(state: CommandState) -> StepOutput:
         print(error)
         return StepOutput.stay()
 
-    state.args = config_command.args
+    state.args = [
+        ConfigArg(flag=arg.flag, value=arg.value)
+        for arg in config_command.args
+    ]
     state.executable = config_command.executable
     state.name = config_command.name
 
-    return StepOutput.next("execute_alvie")
+    return StepOutput.next(next_step="select_output_mode")
 
 
 def branch_config(state: CommandState) -> StepOutput:
@@ -215,34 +209,48 @@ def branch_config(state: CommandState) -> StepOutput:
         return StepOutput.next("select_command")
 
 
-def execute_alvie(state: CommandState) -> StepOutput:
-    if not state.executable:
+def select_output_mode(state: CommandState) -> StepOutput:
+    raw_output = create_prompt(
+        ConfirmPrompt,
+        allow_back=True,
+        message="Do you want to see the standard raw output of the command?",
+        default=False,
+    ).execute()
+    
+    if raw_output is StepResult.BACK:
+        return StepOutput.back()
+    
+    state.raw_output = raw_output
+    if not state.raw_output:
+        return StepOutput.next(next_step="select_json_output_path")
+    
+    return StepOutput.next(next_step="execute_alvie")
+    
+
+def select_json_output_path(state: CommandState) -> StepOutput:
+    json_output_path : Path | None = validate_save_path(
+        message="Where do you want to save parsed output JSON?",
+        default_path="/home/alvie/alvie-cli/parsed-output/parsed_output.json",
+        validator=FileExtensionValidator.json_file_validator()
+    )
+
+    if json_output_path is StepResult.BACK:
         return StepOutput.back()
 
-    raw_output: bool = create_prompt(
-            ConfirmPrompt,
-            allow_back=True,
-            message="Do you want to see the standard raw output of the command?",
-            default=False,
-        ).execute()
-    
-    json_output_path = None
-    if not raw_output:
-        json_output_path = validate_save_path(
-            message="Where do you want to save parsed output JSON?",
-            default_path="/home/alvie/alvie-cli/parsed-output/parsed_output.json",
-            validator=FileExtensionValidator.json_file_validator()
-        )
+    state.json_output_path = json_output_path
+    return StepOutput.next(next_step="execute_alvie")
 
-    if raw_output is StepResult.BACK:
+
+def execute_alvie(state: CommandState) -> StepOutput:
+    if not state.executable:
         return StepOutput.back()
 
     AlvieExecution(
         alvie_path=ALVIE_PATH,
         executable=state.executable,
         args=state.args,
-        is_raw_output=raw_output,
-        json_output_path=json_output_path,
+        is_raw_output=state.raw_output,
+        json_output_path=state.json_output_path,
     ).run()
 
     return StepOutput.next()
@@ -270,7 +278,7 @@ def select_command(state: CommandState) -> StepOutput:
     state.name = action.name
     state.executable = action.executable
 
-    return StepOutput.next("select_args")
+    return StepOutput.next(next_step="select_args")
 
 
 def select_dump(state: CommandState) -> StepOutput:
@@ -287,12 +295,13 @@ def select_dump(state: CommandState) -> StepOutput:
     if dump_config:
         return StepOutput.next(next_step="select_dump_path")
     else:
-        return StepOutput.next(next_step="execute_alvie")
+        return StepOutput.next(next_step="select_output_mode")
 
 
 def select_dump_path(state: CommandState) -> StepOutput:
     WORKING_PATH = os.environ.get("WORKING_PATH", "/home/alvie/alvie-cli")
             
+    # use create prompt in validate_save_path to allow back navigation
     config_path = validate_save_path(
         message="Select the path where to save the configuration:",
         default_path=f"{WORKING_PATH}/presets/config.json",
@@ -304,11 +313,16 @@ def select_dump_path(state: CommandState) -> StepOutput:
             json.dump({
                 "name" : state.name,
                 "executable" : state.executable,
-                "args": state.args
+                "args": [
+                    {"flag": arg.flag, "value": arg.value}
+                    if arg.value is not None
+                    else {"flag": arg.flag}
+                    for arg in state.args
+                ]
             }, config_file, indent=2)
         print(f"Configuration saved to {config_path}")
 
-    return StepOutput.next(next_step="execute_alvie")
+    return StepOutput.next(next_step="select_output_mode")
 
 
 def execute() -> None:
@@ -322,6 +336,8 @@ def execute() -> None:
             "select_args": select_args,
             "select_dump": select_dump,
             "select_dump_path": select_dump_path,
+            "select_output_mode": select_output_mode,
+            "select_json_output_path": select_json_output_path,
             "execute_alvie": execute_alvie,
         },
         root="branch_config",

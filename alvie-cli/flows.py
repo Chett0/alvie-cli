@@ -2,8 +2,11 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, Generic, TypeVar
+from pydantic import BaseModel
+from pathlib import Path
+import sys
 
-from utils import clear_from_cursor, restore_cursor, save_cursor, move_cursor_up
+ESC = "\033["
 
 ESC_INSTRUCTION = "ESC to go back"
 HELP_INSTRUCTION = "F1 for help"
@@ -88,7 +91,7 @@ class Flow(Generic[StateT]):
 
     def run(self) -> None:
         while self.current:
-            save_cursor()
+            Flow.save_cursor()
             step = self.steps[self.current]
             res = step(self.state)
 
@@ -116,16 +119,44 @@ class Flow(Generic[StateT]):
                 )
                 self.current = res.next_step
 
-    def clear_step(self):
-        restore_cursor()
-        move_cursor_up()
-        save_cursor()
-        clear_from_cursor()
+    @staticmethod
+    def clear_step():
+        Flow.restore_cursor()
+        Flow.move_cursor_up()
+        Flow.save_cursor()
+        Flow.clear_from_cursor()
 
+    @staticmethod
+    def move_cursor_up(lines: int = 1):
+        sys.stdout.write(ESC + f"{lines}A")
+        sys.stdout.flush()
+
+    @staticmethod
+    def save_cursor():
+        sys.stdout.write(ESC + "s")
+        sys.stdout.flush()
+
+    @staticmethod
+    def restore_cursor():
+        sys.stdout.write(ESC + "u")
+        sys.stdout.flush()
+
+    @staticmethod
+    def clear_from_cursor():
+        sys.stdout.write(ESC + "J")
+        sys.stdout.flush()
+
+
+class ConfigArg(BaseModel):
+    """A single command argument as a flag and its optional value."""
+    flag: str
+    value: str | None = None
 
 
 @dataclass
 class CommandState:
     name : str | None = None
-    args : list[str] = field(default_factory=list)
+    args : list[ConfigArg] = field(default_factory=list)
     executable : str | None = None
+    raw_output : bool = True
+    json_output_path : Path | None = None

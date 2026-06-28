@@ -14,7 +14,7 @@ from InquirerPy.prompts.confirm import ConfirmPrompt
 
 from instructions import BaseChoice
 from validators import FileExtensionValidator, DirectoryValidator, HashValidator, IntValidator, ValuesValidator, HexValidator
-from flows import create_prompt
+from flows import create_prompt, ConfigArg
 
 class InputType(Enum):
     FILENAME = "filename"
@@ -150,4 +150,4 @@ class Command(BaseChoice):
 class ConfigCommand(BaseModel):
     name: str
     executable: str
-    args : list[str]
+    args: list[ConfigArg] = Field(default_factory=list)

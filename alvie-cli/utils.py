@@ -1,6 +1,5 @@
 import os
 import json
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from dotenv import load_dotenv
@@ -10,9 +9,9 @@ from InquirerPy.prompts.confirm import ConfirmPrompt
 
 from InquirerPy.base.control import Choice
 
-load_dotenv()
+from flows import create_prompt
 
-ESC = "\033["
+load_dotenv()
 
 DONE_CHOICE : Choice = Choice(value="Done", name="[✓] Done")
 BACK_CHOICE : Choice = Choice(value="Back", name="[←] Back")
@@ -103,20 +102,3 @@ def validate_save_path(
         # Create parent directories if they don't exist
         path.parent.mkdir(parents=True, exist_ok=True)
         return path
-
-
-def move_cursor_up(lines: int = 1):
-    sys.stdout.write(ESC + f"{lines}A")
-    sys.stdout.flush()
-
-def save_cursor():
-    sys.stdout.write(ESC + "s")
-    sys.stdout.flush()
-
-def restore_cursor():
-    sys.stdout.write(ESC + "u")
-    sys.stdout.flush()
-
-def clear_from_cursor():
-    sys.stdout.write(ESC + "J")
-    sys.stdout.flush()

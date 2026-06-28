@@ -11,6 +11,7 @@ import re
 
 from utils import load_output_symbols
 from output_models import ParsedHypothesis, ParsedRun, ParsedStep, ParsedSymbol
+from flows import ConfigArg
 
 RESET = "\033[0m"
 BOLD = "\033[1m"
@@ -139,7 +140,7 @@ class AlvieExecution:
 
     alvie_path: Path
     executable: str
-    args: list[str] = field(default_factory=list)
+    args: list[ConfigArg] = field(default_factory=list)
     is_raw_output: bool = False
     json_output_path: Path | None = None
 
@@ -155,16 +156,19 @@ class AlvieExecution:
         return f"{self.alvie_path}/_build/default/bin/{self.executable}"
 
     @property
+    def args_string(self) -> list[str]:
+        """Arguments flattened into CLI tokens (``["--flag", "value", ...]``)."""
+        tokens: list[str] = []
+        for arg in self.args:
+            tokens.append(arg.flag)
+            if arg.value is not None:
+                tokens.append(arg.value)
+        return tokens
+
+    @property
     def command(self) -> list[str]:
         """Full command line passed to the subprocess."""
-        return [self.exe, *self.args]
-
-    def arg_pairs(self) -> list[tuple[str, str]]:
-        """Return the arguments grouped as (flag, value) pairs."""
-        return [
-            (self.args[2 * i], self.args[2 * i + 1])
-            for i in range(len(self.args) // 2)
-        ]
+        return [self.exe, *self.args_string]
 
     def run(self) -> None:
         """Start the ALVIE process"""
@@ -199,8 +203,11 @@ class AlvieExecution:
         hint(f"  {self.exe}\n")
         if self.args:
             info("Arguments:")
-            for flag, value in self.arg_pairs():
-                print(f"\t{_style(flag, CYAN)}: {value}")
+            for arg in self.args:
+                if arg.value:
+                    print(f"\t{_style(arg.flag, CYAN)}: {arg.value}")
+                else:
+                    print(f"\t{_style(arg.flag, CYAN)}")
         else:
             hint("  (no arguments)")
         hint("\nPress Ctrl+C to stop the execution.")
@@ -339,7 +346,12 @@ class AlvieExecution:
         """Build the JSON-serializable parsed output document."""
         return {
             "executable": self.executable,
-            "args": self.args,
+            "args": [
+                {"flag": arg.flag, "value": arg.value}
+                if arg.value is not None
+                else {"flag": arg.flag}
+                for arg in self.args
+            ],
             "start": self._start_time.isoformat() if self._start_time else None,
             "end": self._end_time.isoformat() if self._end_time else None,
             "recap": {
