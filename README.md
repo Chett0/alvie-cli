@@ -1,7 +1,5 @@
 # ALVIE-CLI
 
----
-
 Python wrapper for [ALVIE](https://github.com/unive-alvie/alvie)
 
 ---
@@ -31,7 +29,7 @@ $ /path/to/alvie/code/_build/default/bin/learn.exe \
 
 #### Interactive mode
 
-![Demo](demos/demo2.png)
+<video src="./demos/demo1.mp4" controls width="800"></video>
 
 #### Non-interactive mode
 
