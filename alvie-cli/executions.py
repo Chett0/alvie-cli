@@ -12,7 +12,7 @@ from prompt_toolkit.validation import ValidationError
 
 from commands import Command, Argument, ConfigCommand
 from utils import DONE_CHOICE, get_alvie_code_path, is_done, load_args, load_commands, validate_save_path
-from output import AlvieExecution
+from output import AlvieExecution, DEBUG_PARSED_OUTPUT_ERROR, debug_enabled
 from entities import build_choices
 from validators import FileExtensionValidator
 from flows import Flow, StepOutput, StepResult, CommandState, ConfigArg, create_prompt
@@ -228,6 +228,10 @@ def select_output_mode(state: CommandState) -> StepOutput:
     
 
 def select_json_output_path(state: CommandState) -> StepOutput:
+    if debug_enabled(state.args):
+        print(DEBUG_PARSED_OUTPUT_ERROR)
+        return StepOutput.back()
+
     parsed_output_path : Path | None = validate_save_path(
         message="Where do you want to save parsed output JSON?",
         default_path="/home/alvie/alvie-cli/parsed-output/parsed_output.json",

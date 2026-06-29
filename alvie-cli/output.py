@@ -43,8 +43,20 @@ ACTORS : dict[str, str] = {
     "red": "Reset",
 }
 
+DEBUG_PARSED_OUTPUT_ERROR = (
+    "Cannot use --debug together with --parsed-output."
+)
+DEBUG_REQUIRES_RAW_OUTPUT_ERROR = (
+    "Alvie's --debug output cannot be parsed reliably. Use --raw-output (-r)."
+)
+
 RUN_SEPARATOR_RE = re.compile(r"\x1b\[1;33m.")
 COLOR_SEPARATOR_RE = re.compile(r"\x1b\[([0-9;]*)m|([^\x1b]+)", re.DOTALL)
+
+
+def debug_enabled(args: list[ConfigArg]) -> bool:
+    """Return whether an ALVIE argument list enables debug logging."""
+    return any(arg.flag == "--debug" for arg in args)
 
 
 def color_from_sgr(sgr_code: str) -> str | None:
@@ -175,6 +187,9 @@ class AlvieExecution:
 
     def run(self) -> None:
         """Start the ALVIE process"""
+        if debug_enabled(self.args) and self.parsed_output_path is not None:
+            raise ValueError(DEBUG_PARSED_OUTPUT_ERROR)
+
         self._print_header()
 
         self._process = None
@@ -200,7 +215,6 @@ class AlvieExecution:
         except subprocess.CalledProcessError as exc:
             self._stop_spinner()
             error(f"Alvie exited with a non-zero status ({exc.returncode}).\n")
-            self._print_stderr()  # print legitimate error messages from Alvie's stderr
 
         finally:
             self._close_output_file()
@@ -307,7 +321,7 @@ class AlvieExecution:
             self.command,
             cwd=self.alvie_path,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=None,
             text=True,
         )
 
@@ -315,13 +329,17 @@ class AlvieExecution:
         if not raw_output:
             raise RuntimeError("No output from Alvie process.")
 
-        stdout_output = raw_output.read()
+        received_output = False
+        for line in raw_output:
+            if not received_output:
+                self._stop_spinner()
+                received_output = True
+            self._write(line, end="", flush=True)
+
         self._process.wait()
         self._end_time = datetime.now()
 
         self._stop_spinner()
-        if stdout_output:
-            self._write(stdout_output)
 
         if self._process.returncode != 0:
             raise subprocess.CalledProcessError(self._process.returncode, self.exe)
@@ -331,7 +349,7 @@ class AlvieExecution:
             self.command,
             cwd=self.alvie_path,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=None,
             text=True,
         )
 
@@ -406,16 +424,6 @@ class AlvieExecution:
                 warn("Alvie did not stop in time, forcing termination.\n")
                 process.kill()
                 process.wait()
-
-    def _print_stderr(self) -> None:
-        process = self._process
-        if process and process.stderr:
-            try:
-                stderr_output = process.stderr.read()
-                if stderr_output:
-                    print(stderr_output)
-            except OSError:
-                pass
 
     def _save_parsed_output(
         self,

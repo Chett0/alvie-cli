@@ -15,7 +15,12 @@ from executions import (
     get_config_command,
     validate_config_command,
 )
-from output import AlvieExecution
+from output import (
+    AlvieExecution,
+    DEBUG_PARSED_OUTPUT_ERROR,
+    DEBUG_REQUIRES_RAW_OUTPUT_ERROR,
+    debug_enabled,
+)
 from utils import get_alvie_code_path
 from banner import print_banner
 
@@ -112,6 +117,12 @@ def run_non_interactive(argv: list[str]) -> None:
             command = validate_config_command(config_command)
         except ValueError as error:
             parser.error(f"{config_path}: {error}")
+
+        if debug_enabled(config_command.args):
+            if not namespace.raw_output:
+                parser.error(f"{config_path}: {DEBUG_REQUIRES_RAW_OUTPUT_ERROR}")
+            if namespace.parsed_output:
+                parser.error(f"{config_path}: {DEBUG_PARSED_OUTPUT_ERROR}")
 
         executions.append(AlvieExecution(
             alvie_path=alvie_path,
