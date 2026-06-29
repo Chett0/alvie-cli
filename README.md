@@ -29,7 +29,7 @@ $ /path/to/alvie/code/_build/default/bin/learn.exe \
 
 #### Interactive mode
 
-<video src="./demos/demo1.mp4" controls width="800"></video>
+![ALVIE CLI demo](./demos/demo1.gif)
 
 #### Non-interactive mode
 
