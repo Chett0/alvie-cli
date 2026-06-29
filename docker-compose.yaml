@@ -2,7 +2,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: alvie-cli/Dockerfile
     
     hostname: alvie-cli
 
@@ -14,3 +14,12 @@ services:
     tty: true
     # activate venv
     command: /bin/bash --rcfile /home/alvie/venv/bin/activate
+  viewer:
+    build:
+      context: ./alvie-viewer
+      dockerfile: Dockerfile
+
+    hostname: alvie-viewer
+
+    ports:
+      - "4242:80"

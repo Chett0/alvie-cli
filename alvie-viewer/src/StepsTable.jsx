@@ -1,0 +1,114 @@
+import symbolCatalog from './output_symbols.json'
+import { ActorBadge, SymbolBadge } from './Badges'
+
+function ActionDetails({ symbol, details }) {
+  return (
+    <div className="step-action">
+      <div className="d-flex align-items-center flex-wrap gap-2">
+        <span className="fw-semibold">{details?.name ?? 'Unknown action'}</span>
+        <SymbolBadge symbol={symbol} color={details?.color} />
+      </div>
+
+      <div className="small text-secondary mt-1">
+        {details?.description ?? 'No description available'}
+      </div>
+    </div>
+  )
+}
+
+function StepsTable({ steps }) {
+  return (
+    <div className="table-responsive border rounded-3">
+      <table className="table steps-table align-middle mb-0">
+        <caption className="visually-hidden">Run steps</caption>
+
+        <thead className="table-light">
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">Input actor</th>
+            <th scope="col">Input action</th>
+            <th scope="col" className="text-center">
+              <span className="visually-hidden">Produces</span>
+              <span aria-hidden="true">→</span>
+            </th>
+            <th scope="col">Output actor</th>
+            <th scope="col">Output action</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {steps.map((step, stepIndex) => {
+            const inputs = step.inputs ?? []
+            const outputs = step.outputs ?? []
+            const outputRows = outputs.length ? outputs : [null]
+
+            return outputRows.map((symbol, outputIndex) => {
+              const isFirstOutput = outputIndex === 0
+              const outputDetails = symbol && symbolCatalog.outputs[symbol]
+
+              return (
+                <tr key={`${stepIndex}-${symbol ?? 'empty'}-${outputIndex}`}>
+                  {isFirstOutput && (
+                    <>
+                      <th scope="row" rowSpan={outputRows.length}>
+                        {stepIndex + 1}
+                      </th>
+
+                      <td rowSpan={outputRows.length}>
+                        <div className="step-stack">
+                          {inputs.map((input, inputIndex) => (
+                            <ActorBadge
+                              actor={input.actor}
+                              key={`${input.symbol}-${input.actor}-${inputIndex}`}
+                            />
+                          ))}
+                        </div>
+                      </td>
+
+                      <td rowSpan={outputRows.length}>
+                        <div className="step-stack">
+                          {inputs.map((input, inputIndex) => (
+                            <div
+                              className="step-cell-item"
+                              key={`${input.symbol}-${inputIndex}`}
+                            >
+                              <ActionDetails
+                                symbol={input.symbol}
+                                details={symbolCatalog.inputs[input.symbol]}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+
+                      <td
+                        className="text-center fs-4"
+                        rowSpan={outputRows.length}
+                      >
+                        <span aria-hidden="true">→</span>
+                      </td>
+                    </>
+                  )}
+
+                  <td>
+                    <ActorBadge actor={outputDetails?.actor} />
+                  </td>
+
+                  <td>
+                    {symbol ? (
+                      <ActionDetails symbol={symbol} details={outputDetails} />
+                    ) : (
+                      <span className="text-secondary">No output</span>
+                    )}
+                  </td>
+                </tr>
+              )
+            })
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+export default StepsTable

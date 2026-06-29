@@ -204,7 +204,7 @@ class AlvieExecution:
                 self._run_raw()
             else:
                 self._run_parsed()
-            success("\nAlvie finished successfully.\n")
+            success("Alvie finished successfully.\n")
 
         except KeyboardInterrupt:
             self._stop_spinner()
@@ -367,7 +367,7 @@ class AlvieExecution:
         for i, line in enumerate(raw_output):
             if line.strip():
                 self._stop_spinner()
-                self._write()
+                # self._write()
                 hypothesis = parse_hypothesis(
                     raw_hypothesis=line.strip(),
                     input_symbols=input_symbols,
@@ -375,8 +375,8 @@ class AlvieExecution:
                     output_counts=output_counts,
                 )
                 parsed_hypotheses.append(hypothesis)
-                formatted_hypothesis = format_hypothesis(hypothesis)
-                self._write(f"Hypothesis {i+1}\n", formatted_hypothesis, flush=True)
+                # formatted_hypothesis = format_hypothesis(hypothesis)
+                # self._write(f"Hypothesis {i+1}\n", formatted_hypothesis, flush=True)
                 self._spinner = Spinner(f"Waiting for the next hypothesis {i+2}").start()
 
         self._stop_spinner()
@@ -398,7 +398,7 @@ class AlvieExecution:
             for run in hypothesis.runs
         )
 
-        self._write(format_recap(output_symbols, output_counts, hypotheses_count, runs_count, steps_count))
+        # self._write(format_recap(output_symbols, output_counts, hypotheses_count, runs_count, steps_count))
         self._save_parsed_output(parsed_hypotheses, output_counts, hypotheses_count, runs_count, steps_count)
 
     def _stop_spinner(self) -> None:

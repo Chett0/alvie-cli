@@ -1,5 +1,6 @@
 BASE_IMAGE := matteobusi/alvie
 SERVICE := app
+VIEWER_SERVICE := viewer
 VENV_ACTIVATE := /home/alvie/venv/bin/activate
 
 .PHONY: all pull build rebuild run compose compose-up compose-exec compose-stop compose-start compose-start-container compose-restart compose-restart-container
@@ -15,15 +16,20 @@ build:
 rebuild:
 	docker compose build --no-cache
 
+# start viewer in background and run alvie-cli in foreground
 run:
+	docker compose up -d $(VIEWER_SERVICE)
 	docker compose run --rm -it $(SERVICE)
 
+viewer:
+	docker compose up -d $(VIEWER_SERVICE)
 
-compose: compose-up exec
+compose: 
+	docker compose up -d
+	docker compose exec -it $(SERVICE) /bin/bash --rcfile $(VENV_ACTIVATE)
 
 compose-up:
 	docker compose up -d $(SERVICE)
-
 
 stop:
 	docker compose stop $(SERVICE)

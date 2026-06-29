@@ -15,3 +15,5 @@ __pycache__/
 .vscode-server/
 .gitconfig
 
+alvie-viewer/node_modules/
+alvie-viewer/dist

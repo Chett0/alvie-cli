@@ -1,0 +1,15 @@
+/* Import JSON drag and drop style */
+
+.import-drop-zone {
+  color: inherit;
+  background: var(--bs-tertiary-bg);
+  border: 2px dashed var(--bs-border-color);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.import-drop-zone:hover,
+.import-drop-zone:focus-visible,
+.import-drop-zone.is-dragging {
+  background: var(--bs-primary-bg-subtle);
+  border-color: var(--bs-primary);
+}
