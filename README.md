@@ -2,7 +2,8 @@
 
 Python wrapper for [ALVIE](https://github.com/unive-alvie/alvie)
 
----
+<br>
+<br>
 
 ### What is ALVIE?
 
@@ -11,6 +12,8 @@ ALVIE is a research tool for the automated security analysis and vulnerability d
 ### Why ALVIE-CLI?
 
 It provides a user-friendly command-line interface (CLI) that simplifies the interaction with ALVIE, by offering interactive guided workflows, configuration management and output parsing.
+
+<br>
 
 #### Before
 
@@ -25,16 +28,23 @@ $ /path/to/alvie/code/_build/default/bin/learn.exe \
   --secret 0
 ```
 
+<br>
+
 ### After
 
 #### Interactive mode
 
 ![ALVIE CLI demo](./demos/demo1.gif)
 
+<br>
+
 #### Non-interactive mode
 
-![Demo](demos/demo1.png)
+Use a previously saved configuration to run the same command without any user interaction
 
+![ALVIE CLI demo](./demos/demo2.gif)
+
+<br>
 
 ### Requirements
 
@@ -51,6 +61,8 @@ git clone https://github.com/Chett0/alvie-cli
 make
 ```
 
+This will build both the ALVIE-CLI and ALVIE-VIEWER images, available at `localhost:4242`
+
 <br>
 
 If you want to update the base image `matteobusi/alvie`
@@ -66,32 +78,6 @@ make
 
 The default mode guides you through selecting a command, providing its arguments and (optionally) saving the resulting configuration.
 
-```bash
-$ python alvie-cli
-```
-
-```bash
-   █████╗  ██╗     ██╗   ██╗ ██╗ ███████╗
-  ██╔══██╗ ██║     ██║   ██║ ██║ ██╔════╝
-  ███████║ ██║     ██║   ██║ ██║ █████╗  
-  ██╔══██║ ██║     ╚██╗ ██╔╝ ██║ ██╔══╝  
-  ██║  ██║ ███████╗ ╚████╔╝  ██║ ███████╗
-  ╚═╝  ╚═╝ ╚══════╝  ╚═══╝   ╚═╝ ╚══════╝
-
-  ╭─────────────────────────────────────────╮
-  │ ✻ Welcome to Alvie CLI                  │
-  │                                         │
-  │ Interface for the Alvie analysis tool   │
-  │ Pick an action below  ·  Ctrl+C to exit │
-  ╰─────────────────────────────────────────╯
-
-? What do you want to do: 
-❯ Execute a command
-  Build enclave
-  Build attacker
-  Exit
-```
-
 <br>
 
 You can run one of the following commands:
@@ -102,6 +88,15 @@ You can run one of the following commands:
 - **Property-based testing**: Random NI tests on the Sancus simulator without learning a model. Faster than Learn
 
 <br>
+
+##### Example: learning a model 
+
+We want to run the **Learn.exe** command with the following specification:
+
+- Enclave and Attacker specifications in `/home/alvie/spec-lib/example`
+- Random walk oracle
+
+We also want to save the configuration for reproducing the same command later and save the parsed output in a JSON file for further analysis with `alvie-viewer`.
 
 ```bash
 ? What do you want to do: Execute a command
@@ -118,25 +113,15 @@ You can run one of the following commands:
 ? Do you want to provide optional arguments? [✓] Done
 ? Do you want to save this configuration? Yes
 ? Select the path where to save the configuration: /home/alvie/alvie-cli/presets/config.json
-? File 'config.json' already exists. Overwrite? Yes
 Configuration saved to /home/alvie/alvie-cli/presets/config.json
-? Do you want to see the standard raw output of the command? Yes
+? Do you want to see the standard raw output of the command? No
+? Where do you want to save parsed output JSON? /home/alvie/alvie-cli/parsed-output/parsed_output.json
 
-Running learn.exe
-  /home/alvie/alvie/code/_build/default/bin/learn.exe
+...
 
-Arguments:
-	--att-spec: /home/alvie/spec-lib/example/attacker.atdl
-	--encl-spec: /home/alvie/spec-lib/example/enclave.etdl
-	--oracle: randomwalk
-	--tmpdir: /tmp/alvie
-	--res: /tmp/alvie/result.dot
-	--sancus: /home/alvie/sancus-core-gap
-	--secret: 0
+Parsed output saved to /home/alvie/alvie-cli/parsed-output/parsed_output.json
 
-Press Ctrl+C to stop the execution.
-
-Streaming raw output
+Alvie finished successfully.
 ```
 
 <br>
@@ -179,8 +164,7 @@ Saved in: /home/alvie/alvie-cli/enclaves/victim.etdl
 
 For a complete list of available instructions and combinators, please refer to the [ALVIE Spec Tutorial: Attacker and Victim Modeling](https://github.com/unive-alvie/alvie/blob/documentation/docs/spec-tutorial.md)
 
-
-
+<br>
 
 #### Non-interactive execution
 
@@ -241,3 +225,9 @@ Use `--njobs` to run several configurations in parallel:
 ```bash
 python alvie-cli presets/*.json --njobs 4
 ```
+
+<br>
+
+### ALVIE-VIEWER
+
+Documentation at [ALVIE Viewer](./alvie-viewer)

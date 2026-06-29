@@ -1,40 +1,64 @@
 # ALVIE VIEWER
 
-### Starting
+Web interface for exploring and filtering parsed JSON results produced by ALVIE-CLI.
+
+![ALVIE Viewer - demo](./demos/main.png)
+
+<br>
+
+### Features
+
+- Import parsed ALVIE output through file selection or drag and drop
+- View execution recap: command run, executable, arguments, start/end timestamps
+- Browse hypotheses, runs, steps
+- Filter results by actor, input and output symbols
+- Search results using regular expressions
+
+<br>
+
+### Usage
+
+First generate a parsed output file with ALVIE-CLI
 
 ```bash
-npm create vite@latest alvie-cli-viewer -- --template react
-cd alvie-cli-viewer
-npm install
-npm install bootstrap
+python alvie-cli presets/config.json \
+  --parsed-output parsed-output/result.json
 ```
 
-#### Commands
+Then open: `http://localhost:4242` and import the `parsed-output/result.json` file.
+
+<br>
+
+Each hypothesis can be expanded to show the runs and a table with all its steps. 
+
+![table example](./demos/table_example.png)
+
+You can filter results by actor, input or output symbols. When a run matches the selected filters, all its steps are displayed, so you can understand the entire context.
+
+<br>
+
+You can also use the search bar to filter by hypothesis or run number and use regular expressions to search for multiple patterns.
+
+#### Examples
+
+Search for hypotheses 1-3:
 
 ```bash
-# while developing
-npm run dev 
-
-# before realising
-npm run build 
-
-# verify release
-npm run preview
+hypothesis [1-3]\b
 ```
 
-Add `dist` to alvie-cli main project and start a python server in the root of the project to test the release.
+<br>
 
-### Regex search
-
-Example
+Search for runs 11000 - 12000:
 
 ```bash
-# Search for hypotheses 1-3
-\bhypothesis [1-3]\b
-
-# Search for runs 11000 - 12000
 \brun 11\d{3}\b
+```
 
-# Search for multiple patterns
+<br>
+
+Search for multiple patterns:
+
+```bash
 <regex1>|<regex2>|<regex3>
 ```
