@@ -43,5 +43,5 @@ class ParsedRun:
 class ParsedHypothesis:
     runs: list[ParsedRun] = field(default_factory=list)
 
-    def to_dict(self) -> list[list[dict]]:
+    def to_dict(self) -> list[dict]:
         return [run.to_dict() for run in self.runs]

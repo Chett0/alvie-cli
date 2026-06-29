@@ -367,9 +367,21 @@ class AlvieExecution:
 
         if self._process.returncode != 0:
             raise subprocess.CalledProcessError(self._process.returncode, self.exe)
+        
+        # Count tot number of hypotheses, runs and steps
+        hypotheses_count = len(parsed_hypotheses)
+        runs_count = sum(
+            len(hypothesis.runs)
+            for hypothesis in parsed_hypotheses
+        )
+        steps_count = sum(
+            len(run.steps)
+            for hypothesis in parsed_hypotheses
+            for run in hypothesis.runs
+        )
 
-        self._write(format_recap(output_symbols, output_counts))
-        self._save_parsed_output(parsed_hypotheses, output_counts)
+        self._write(format_recap(output_symbols, output_counts, hypotheses_count, runs_count, steps_count))
+        self._save_parsed_output(parsed_hypotheses, output_counts, hypotheses_count, runs_count, steps_count)
 
     def _stop_spinner(self) -> None:
         if self._spinner:
@@ -409,12 +421,15 @@ class AlvieExecution:
         self,
         hypotheses: list[ParsedHypothesis],
         output_counts: Counter[str],
+        hypotheses_count: int,
+        runs_count: int,
+        steps_count: int
     ) -> None:
         """Save parsed output as JSON when an output path is provided."""
         if not self.parsed_output_path:
             return
 
-        output_data = self._build_output_json(hypotheses, output_counts)
+        output_data = self._build_output_json(hypotheses, output_counts, hypotheses_count, runs_count, steps_count)
 
         try:
             self.parsed_output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -430,6 +445,9 @@ class AlvieExecution:
         self,
         hypotheses: list[ParsedHypothesis],
         output_counts: Counter[str],
+        hypotheses_count: int,
+        runs_count: int,
+        steps_count: int
     ) -> dict:
         """Build the JSON-serializable parsed output document."""
         return {
@@ -446,6 +464,10 @@ class AlvieExecution:
                 symbol: count
                 for symbol, count in output_counts.items()
                 if count > 0
+            } | {
+                "hypotheses": hypotheses_count,
+                "runs": runs_count,
+                "steps": steps_count
             },
             "hypotheses": [hypothesis.to_dict() for hypothesis in hypotheses],
         }
@@ -453,12 +475,26 @@ class AlvieExecution:
 
 def format_recap(
         output_symbols: dict,
-        output_counts: Counter[str]
+        output_counts: Counter[str],
+        hypotheses_count: int,
+        runs_count: int,
+        steps_count: int,
 ) -> str:
-    """Format the total occurrences of each output symbol."""
-    lines = ["Recap\n"]
+    """Format the total occurrences of number of hypotheses, runs, steps and output symbol."""
+    
+    lines = [
+        "Recap\n",
+        f"\tHypotheses: {hypotheses_count}",
+        f"\tRuns: {runs_count}",
+        f"\tSteps: {steps_count}",
+        "\n\tOutputs:",
+    ]
+    
+    # show only output symbols with non-zero occurrences
+    
     for symbol, data in output_symbols.items():
-        lines.append(f"\t{data['name']} ({symbol}): {output_counts[symbol]}")
+        if output_counts[symbol] > 0:
+            lines.append(f"\t- {data['name']} ({symbol}): {output_counts[symbol]}")
     return "\n".join(lines) + "\n"
 
 
