@@ -189,18 +189,41 @@ python alvie-cli <config-file> [<config-file> ...] [-r | --raw-output] [-o | --o
 - `--njobs <n>`: number of configurations to run in parallel (default: `1`, i.e. sequential execution).
 
 The configuration file uses the same format produced by the interactive mode when
-saving a command. It contains the command `name`, its `executable` and the list of
-`args` (flags followed by their values):
+saving a command.
 
 ```json
 {
   "name": "Learn",
   "executable": "learn.exe",
   "args": [
-    "--att-spec", "/home/alvie/spec-lib/example/attacker.atdl",
-    "--encl-spec", "/home/alvie/spec-lib/example/enclave.etdl",
-    "--oracle", "randomwalk",
-    "--debug"
+    {
+      "flag": "--att-spec",
+      "value": "/home/alvie/spec-lib/example/attacker.atdl"
+    },
+    {
+      "flag": "--encl-spec",
+      "value": "/home/alvie/spec-lib/example/enclave.etdl"
+    },
+    {
+      "flag": "--oracle",
+      "value": "randomwalk"
+    },
+    {
+      "flag": "--tmpdir",
+      "value": "/tmp/alvie"
+    },
+    {
+      "flag": "--res",
+      "value": "/tmp/alvie/result.dot"
+    },
+    {
+      "flag": "--sancus",
+      "value": "/home/alvie/sancus-core-gap"
+    },
+    {
+      "flag": "--secret",
+      "value": "0"
+    }
   ]
 }
 ```
