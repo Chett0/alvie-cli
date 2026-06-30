@@ -33,6 +33,7 @@ compose-up:
 
 stop:
 	docker compose stop $(SERVICE)
+	docker compose stop $(VIEWER_SERVICE)
 
 
 start: compose-start exec
