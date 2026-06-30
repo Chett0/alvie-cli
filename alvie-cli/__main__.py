@@ -1,14 +1,15 @@
 import argparse
+import os
+import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import sys
 from pathlib import Path
 
 from InquirerPy.prompts.list import ListPrompt
 from InquirerPy.base.control import Choice
-from prompt_toolkit.document import Document
-from prompt_toolkit.validation import ValidationError
+
 
 from entities import Entity, build_entity
-from validators import FileExtensionValidator
 from executions import (
     execute,
     build_commands,
@@ -17,21 +18,99 @@ from executions import (
 )
 from output import (
     AlvieExecution,
+    ParallelDashboard,
     DEBUG_PARSED_OUTPUT_ERROR,
     DEBUG_REQUIRES_RAW_OUTPUT_ERROR,
     debug_enabled,
+    merge_tmp_file,
+    remove_tmp_files,
 )
-from utils import get_alvie_code_path
+from utils import (
+    get_alvie_code_path,
+    json_output_path,
+)
 from banner import print_banner
 
 
-def json_output_path(value: str) -> Path:
-    """Validate a JSON output"""
+def run_parallel(
+        output_path: Path | None,
+        executions: list[AlvieExecution],
+        njobs: int
+):
+    """Run Parallel execution: each execution writes to its own temp file, and every
+       temp file is merged into the final output as soon as its run finishes
+       (merge order follows completion order, not configuration order)."""
+    tmp_dir = None
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_dir = output_path.parent / "tmp"
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+    
+    for execution in executions:
+        execution.parallel = True
+        if tmp_dir:
+            execution.output_path = tmp_dir / (
+                f"{output_path.stem}.{uuid.uuid4().hex}.part" # type: ignore
+            )
+
+    print()
+    dashboard = ParallelDashboard(
+        [_execution_label(execution) for execution in executions]
+    )
+
+    def run_tracked(index: int, execution: AlvieExecution) -> None:
+        dashboard.set_running(index)
+        try:
+            execution.run()
+        except BaseException:
+            dashboard.set_failed(index)
+            raise
+        dashboard.set_done(index)
+
     try:
-        FileExtensionValidator.json_file_validator().validate(Document(value))
-    except ValidationError as error:
-        raise argparse.ArgumentTypeError(error.message)
-    return Path(value)
+        if output_path:
+            with output_path.open("w", encoding="utf-8") as merged:
+                with dashboard:
+                    with ThreadPoolExecutor(max_workers=njobs) as executor:
+                        futures = {
+                            executor.submit(run_tracked, index, execution): execution
+                            for index, execution in enumerate(executions)
+                        }
+
+                    for future in as_completed(futures):
+                        future.result()
+                        merge_tmp_file(merged, futures[future].output_path)
+        else:
+            with dashboard:
+                with ThreadPoolExecutor(max_workers=njobs) as executor:
+                    futures = {
+                        executor.submit(run_tracked, index, execution): execution
+                        for index, execution in enumerate(executions)
+                    }
+
+        if output_path:
+            print(f"\nAll executions completed. Merged output written to {output_path}\n")
+        else:
+            print("\nAll executions completed.")
+            for execution in executions:
+                if execution.parsed_output_path:
+                    print(f"  Parsed output saved to {execution.parsed_output_path}")
+            print()
+
+    except Exception as e:
+        print(f"\nError during execution: {e}\n")
+        sys.exit(1)
+    finally:
+        remove_tmp_files(executions)
+        
+
+
+def _execution_label(execution: AlvieExecution, max_width: int = 48) -> str:
+    """Build a short, single-line label describing an execution for the dashboard."""
+    label = " ".join([execution.executable, *execution.args_string]).strip()
+    if len(label) > max_width:
+        label = label[: max_width - 1] + "…"
+    return label
 
 
 def run_non_interactive(argv: list[str]) -> None:
@@ -96,6 +175,9 @@ def run_non_interactive(argv: list[str]) -> None:
     if namespace.njobs < 1:
         parser.error("--njobs must be a positive integer")
 
+    if namespace.njobs > 1 and not namespace.parsed_output and namespace.output is None:
+            parser.error("--njobs > 1 requires --output to be specified")
+
     if not namespace.configs:
         parser.error("No configuration files provided")
     if namespace.parsed_output and len(namespace.parsed_output) != len(namespace.configs):
@@ -134,10 +216,16 @@ def run_non_interactive(argv: list[str]) -> None:
         ))
 
     # sequential execution
-    if namespace.njobs == 1:
+    if namespace.njobs == 1 or len(executions) == 1:
         for execution in executions:
-            execution.run()
-    # TODO parallel execution
+            execution.run_seq()
+            
+    else:
+        run_parallel(
+            output_path=namespace.output,
+            executions=executions,
+            njobs=namespace.njobs
+        )
 
 
 def run_interactive() -> None:

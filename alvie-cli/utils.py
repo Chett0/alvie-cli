@@ -1,3 +1,4 @@
+import argparse
 import os
 import json
 from dataclasses import dataclass
@@ -6,10 +7,12 @@ from dotenv import load_dotenv
 
 from InquirerPy.prompts.filepath import FilePathPrompt
 from InquirerPy.prompts.confirm import ConfirmPrompt
-
 from InquirerPy.base.control import Choice
+from prompt_toolkit.document import Document
+from prompt_toolkit.validation import ValidationError
 
 from flows import create_prompt
+from validators import FileExtensionValidator
 
 load_dotenv()
 
@@ -102,3 +105,12 @@ def validate_save_path(
         # Create parent directories if they don't exist
         path.parent.mkdir(parents=True, exist_ok=True)
         return path
+    
+
+def json_output_path(value: str) -> Path:
+    """Validate a JSON output"""
+    try:
+        FileExtensionValidator.json_file_validator().validate(Document(value))
+    except ValidationError as error:
+        raise argparse.ArgumentTypeError(error.message)
+    return Path(value)

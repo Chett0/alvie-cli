@@ -2,6 +2,7 @@ from datetime import datetime
 from io import TextIOWrapper
 import os
 import sys
+import time
 import json
 import threading
 import subprocess
@@ -9,6 +10,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from collections import Counter
 import re
+import shutil
+from typing import IO
 
 from utils import load_output_symbols
 from output_models import ParsedHypothesis, ParsedRun, ParsedStep, ParsedSymbol
@@ -147,6 +150,146 @@ class Spinner:
         self.stop()
 
 
+class ParallelDashboard:
+    """Live terminal dashboard for parallel ALVIE executions.
+
+    Renders one status line per execution and rewrites the whole block in place
+    (ANSI cursor moves) so each line flips queued -> running -> done/failed as
+    soon as its thread changes state, with an animated spinner and a live
+    elapsed-time counter. Degrades to plain one-shot prints when stdout is not a
+    color-capable TTY."""
+
+    QUEUED, RUNNING, DONE, FAILED = "queued", "running", "done", "failed"
+
+    _BADGES: dict[str, tuple[str, str, str]] = {
+        QUEUED: (DIM, "·", "QUEUED"),
+        RUNNING: (CYAN, "", "RUNNING"),  # icon replaced by spinner frame
+        DONE: (GREEN, "✓", "DONE"),
+        FAILED: (RED, "✗", "FAILED"),
+    }
+    _SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+    def __init__(self, labels: list[str], interval: float = 0.1):
+        self.labels = labels
+        self.interval = interval
+        self._states = [self.QUEUED] * len(labels)
+        self._starts: list[float | None] = [None] * len(labels)
+        self._ends: list[float | None] = [None] * len(labels)
+        self._lock = threading.Lock()
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._animated = _supports_color()
+        self._frame = 0
+        self._rendered_lines = 0
+
+    def start(self) -> "ParallelDashboard":
+        if not self._animated:
+            info(f"Running {len(self.labels)} executions in parallel "
+                 f"({self._max_label_state()})")
+            return self
+        sys.stdout.write("\033[?25l")  # hide cursor
+        self._render()
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
+        return self
+
+    def set_running(self, index: int) -> None:
+        self._transition(index, self.RUNNING)
+
+    def set_done(self, index: int) -> None:
+        self._transition(index, self.DONE)
+
+    def set_failed(self, index: int) -> None:
+        self._transition(index, self.FAILED)
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread:
+            self._thread.join()
+        if self._animated:
+            self._render()
+            sys.stdout.write("\033[?25h")  # show cursor
+            sys.stdout.flush()
+
+    def __enter__(self) -> "ParallelDashboard":
+        return self.start()
+
+    def __exit__(self, *_exc) -> None:
+        self.stop()
+
+    def _transition(self, index: int, state: str) -> None:
+        with self._lock:
+            now = time.monotonic()
+            if state == self.RUNNING:
+                self._starts[index] = now
+            elif state in (self.DONE, self.FAILED):
+                self._ends[index] = now
+            self._states[index] = state
+        if not self._animated:
+            color, icon, text = self._BADGES[state]
+            line = f"  {_style(f'{icon} {text}', color, BOLD)}  {self.labels[index]}"
+            if state in (self.DONE, self.FAILED):
+                print(f"{line}  {_style(f'{self._elapsed(index):.1f}s', DIM)}")
+            return
+        self._render()
+
+    def _loop(self) -> None:
+        while not self._stop.is_set():
+            self._frame += 1
+            self._render()
+            self._stop.wait(self.interval)
+
+    def _elapsed(self, index: int) -> float:
+        start = self._starts[index]
+        if start is None:
+            return 0.0
+        end = self._ends[index] if self._ends[index] is not None else time.monotonic()
+        if end is None:
+            return 0.0
+        return end - start
+
+    def _max_label_state(self) -> str:
+        done = sum(s in (self.DONE, self.FAILED) for s in self._states)
+        return f"{done}/{len(self._states)} finished"
+
+    def _format_line(self, index: int) -> str:
+        state = self._states[index]
+        color, icon, text = self._BADGES[state]
+        if state == self.RUNNING:
+            icon = self._SPINNER_FRAMES[self._frame % len(self._SPINNER_FRAMES)]
+        badge = _style(f"{icon} {text:<7}", color, BOLD)
+        elapsed = ""
+        if self._starts[index] is not None:
+            elapsed = _style(f"{self._elapsed(index):6.1f}s", DIM)
+        return f"  {badge}  {self.labels[index]}  {elapsed}"
+
+    def _progress_bar(self, done: int, total: int, width: int = 24) -> str:
+        filled = round(width * done / total) if total else 0
+        return _style("█" * filled, GREEN) + _style("░" * (width - filled), DIM)
+
+    def _render(self) -> None:
+        if not self._animated:
+            return
+        with self._lock:
+            done = sum(s in (self.DONE, self.FAILED) for s in self._states)
+            failed = sum(s == self.FAILED for s in self._states)
+            total = len(self._states)
+            header = _style("Parallel execution", CYAN, BOLD)
+            counter = _style(f"{done}/{total}", CYAN, BOLD)
+            if failed:
+                counter += " " + _style(f"({failed} failed)", RED, BOLD)
+            lines = [f"{header}  {self._progress_bar(done, total)}  {counter}"]
+            lines += [self._format_line(i) for i in range(total)]
+
+            buffer = []
+            if self._rendered_lines:
+                buffer.append(f"\033[{self._rendered_lines}F")  # cursor up to block top
+            buffer += [f"\033[2K{line}\n" for line in lines]
+            sys.stdout.write("".join(buffer))
+            sys.stdout.flush()
+            self._rendered_lines = len(lines)
+
+
 @dataclass
 class AlvieExecution:
     """A single ALVIE execution with its arguments and output settings."""
@@ -157,6 +300,7 @@ class AlvieExecution:
     is_raw_output: bool = field(default=False)
     output_path: Path | None = field(default=None)
     parsed_output_path: Path | None = field(default=None)
+    parallel: bool = field(default=False)
 
     _process: subprocess.Popen | None = field(default=None, init=False, repr=False)
     _spinner: Spinner | None = field(default=None, init=False, repr=False)
@@ -185,18 +329,14 @@ class AlvieExecution:
         """Full command line passed to the subprocess."""
         return [self.exe, *self.args_string]
 
+
     def run(self) -> None:
-        """Start the ALVIE process"""
-        if debug_enabled(self.args) and self.parsed_output_path is not None:
-            raise ValueError(DEBUG_PARSED_OUTPUT_ERROR)
-
-        self._print_header()
-
-        self._process = None
-        self._spinner = None
-        self._open_output_file()
-
+        """Run the ALVIE execution with the specified output mode"""
         try:
+            if debug_enabled(self.args) and self.parsed_output_path is not None:
+                raise ValueError(DEBUG_PARSED_OUTPUT_ERROR)
+
+            self._open_output_file()
             self._start_time = datetime.now()
             self._write_header()
 
@@ -204,7 +344,6 @@ class AlvieExecution:
                 self._run_raw()
             else:
                 self._run_parsed()
-            success("Alvie finished successfully.\n")
 
         except KeyboardInterrupt:
             self._stop_spinner()
@@ -218,6 +357,18 @@ class AlvieExecution:
 
         finally:
             self._close_output_file()
+
+
+    def run_seq(self) -> None:
+        """Run ALVIE execution with sequential output to the terminal"""
+        self._print_header()
+        self._process = None
+        self._spinner = None
+        self._spinner = Spinner("Executing ALVIE").start()
+        self.run()
+
+        success("Alvie finished successfully.\n")
+
 
     def _open_output_file(self) -> None:
         """Open the output file for writing when an output path is provided."""
@@ -238,7 +389,8 @@ class AlvieExecution:
         self._write_footer()
         self._output_file.close()
         self._output_file = None
-        info(f"Output saved to {_style(str(self.output_path), CYAN, BOLD)}\n")
+        if not self.parallel:
+            info(f"Output saved to {_style(str(self.output_path), CYAN, BOLD)}\n")
 
     def _write_header(self) -> None:
         """Write a header with execution information to the output file."""
@@ -290,10 +442,16 @@ class AlvieExecution:
             lines.append(f"Duration   : {self._end_time - self._start_time}")
         lines.append("=" * 60)
 
-        self._write("\n".join(lines) + "\n")
+        self._write("\n" + "\n".join(lines) + "\n")
 
-    def _write(self, text: str = "", end: str = "\n", flush: bool = False) -> None:
+    def _write(
+            self, 
+            text: str = "", 
+            end: str = "\n", 
+            flush: bool = False,
+        ) -> None:
         """Write produced output to the output file when set, otherwise to the terminal."""
+
         if self._output_file:
             self._output_file.write(f"{text}{end}")
         else:
@@ -315,9 +473,9 @@ class AlvieExecution:
         hint("\nPress Ctrl+C to stop the execution.")
         print()
 
-    def _run_raw(self) -> None:
-        self._spinner = Spinner("Executing ALVIE").start()
-        self._process = subprocess.Popen(
+    def _get_alvie_process(self) -> tuple[subprocess.Popen, IO[str]]:
+        """Return the ALVIE process and its stdout stream"""
+        process = subprocess.Popen(
             self.command,
             cwd=self.alvie_path,
             stdout=subprocess.PIPE,
@@ -325,49 +483,44 @@ class AlvieExecution:
             text=True,
         )
 
-        raw_output = self._process.stdout
-        if not raw_output:
+        if not process:
+            raise RuntimeError("Alvie process could not be started.")
+        
+        if not process.stdout:
             raise RuntimeError("No output from Alvie process.")
+        
+        return process, process.stdout
 
-        received_output = False
-        for line in raw_output:
-            if not received_output:
-                self._stop_spinner()
-                received_output = True
-            self._write(line, end="", flush=True)
 
-        self._process.wait()
-        self._end_time = datetime.now()
+    def _run_raw(self) -> None:
+        try:
+            self._process, stdout = self._get_alvie_process()
+            received_output = False
+            for line in stdout:
+                if not received_output:
+                    self._stop_spinner()
+                    received_output = True
+                self._write(line, end="", flush=True)
 
-        self._stop_spinner()
+            self._process.wait()
+            self._end_time = datetime.now()
 
-        if self._process.returncode != 0:
-            raise subprocess.CalledProcessError(self._process.returncode, self.exe)
+            if self._process.returncode != 0:
+                raise subprocess.CalledProcessError(self._process.returncode, self.exe)
+        finally:
+            self._stop_spinner()
 
     def _run_parsed(self) -> None:
-        self._process = subprocess.Popen(
-            self.command,
-            cwd=self.alvie_path,
-            stdout=subprocess.PIPE,
-            stderr=None,
-            text=True,
-        )
+        self._process, stdout = self._get_alvie_process()
 
         symbols = load_output_symbols()
         input_symbols, output_symbols = symbols["inputs"], symbols["outputs"]
         output_counts: Counter[str] = Counter()
         parsed_hypotheses: list[ParsedHypothesis] = []
 
-        raw_output = self._process.stdout
-        if not raw_output:
-            raise RuntimeError("No output from Alvie process.")
-
-        self._spinner = Spinner("Waiting for Alvie to produce hypotheses").start()
-
-        for i, line in enumerate(raw_output):
+        for i, line in enumerate(stdout):
             if line.strip():
                 self._stop_spinner()
-                # self._write()
                 hypothesis = parse_hypothesis(
                     raw_hypothesis=line.strip(),
                     input_symbols=input_symbols,
@@ -377,7 +530,8 @@ class AlvieExecution:
                 parsed_hypotheses.append(hypothesis)
                 # formatted_hypothesis = format_hypothesis(hypothesis)
                 # self._write(f"Hypothesis {i+1}\n", formatted_hypothesis, flush=True)
-                self._spinner = Spinner(f"Waiting for the next hypothesis {i+2}").start()
+                if not self.parallel:
+                    self._spinner = Spinner(f"Waiting for the next hypothesis {i+2}").start()
 
         self._stop_spinner()
         self._process.wait()
@@ -443,9 +597,9 @@ class AlvieExecution:
             self.parsed_output_path.parent.mkdir(parents=True, exist_ok=True)
             with self.parsed_output_path.open("w", encoding="utf-8") as file:
                 json.dump(output_data, file, ensure_ascii=False, indent=2)
-                # file.write("\n")
+            if not self.parallel:
                 print()
-            info(f"Parsed output saved to {_style(str(self.parsed_output_path), CYAN, BOLD)}\n")
+                info(f"Parsed output saved to {_style(str(self.parsed_output_path), CYAN, BOLD)}\n")
         except OSError as exc:
             warn(f"Could not save parsed output JSON: {exc}\n")
 
@@ -659,3 +813,28 @@ def format_symbol(
 ) -> str:
     """Format a parsed input or output symbol."""
     return f"{symbol.actor}: {symbol.name} ({symbol.symbol})"
+
+
+def merge_tmp_file(
+        merged: TextIOWrapper,
+        temp_path: Path | None
+):
+    """Merge a temporary file chunk output into the final output file."""
+    if not temp_path or not temp_path.exists():
+        return
+    with temp_path.open("r", encoding="utf-8") as chunk:
+        shutil.copyfileobj(chunk, merged)
+    merged.write("\n")
+
+
+def remove_tmp_files(
+        executions: list[AlvieExecution]
+) -> None:
+    """Remove temporary files created during parallel execution."""
+    for execution in executions:
+        temp_path = execution.output_path
+        if temp_path and temp_path.exists():
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
