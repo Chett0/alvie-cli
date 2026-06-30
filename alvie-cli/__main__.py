@@ -1,5 +1,4 @@
 import argparse
-import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import sys
@@ -16,20 +15,20 @@ from executions import (
     get_config_command,
     validate_config_command,
 )
+from flows import is_debug_enabled
 from output import (
     AlvieExecution,
     ParallelDashboard,
     DEBUG_PARSED_OUTPUT_ERROR,
     DEBUG_REQUIRES_RAW_OUTPUT_ERROR,
-    debug_enabled,
     merge_tmp_file,
     remove_tmp_files,
+    print_banner
 )
 from utils import (
     get_alvie_code_path,
     json_output_path,
 )
-from banner import print_banner
 
 
 def run_parallel(
@@ -200,7 +199,7 @@ def run_non_interactive(argv: list[str]) -> None:
         except ValueError as error:
             parser.error(f"{config_path}: {error}")
 
-        if debug_enabled(config_command.args):
+        if is_debug_enabled(config_command.args):
             if not namespace.raw_output:
                 parser.error(f"{config_path}: {DEBUG_REQUIRES_RAW_OUTPUT_ERROR}")
             if namespace.parsed_output:

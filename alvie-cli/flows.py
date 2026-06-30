@@ -12,6 +12,8 @@ ESC_INSTRUCTION = "ESC to go back"
 HELP_INSTRUCTION = "F1 for help"
 SHOW_INSTRUCTION = "F2 to show"
 
+DEBUG_FLAG = "--debug"
+
 def create_prompt(prompt_cls, allow_back: bool = True, **kwargs):
     # TODO: add help and show instructions
     if allow_back and "long_instruction" not in kwargs:
@@ -151,6 +153,16 @@ class ConfigArg(BaseModel):
     """A single command argument as a flag and its optional value."""
     flag: str
     value: str | None = None
+
+    @property
+    def is_debug(self) -> bool:
+        return self.flag == DEBUG_FLAG
+    
+def is_debug_enabled(
+        args: list[ConfigArg]
+) -> bool:
+    """Return whether an argument list contains the debug flag."""
+    return any(arg.is_debug for arg in args)
 
 
 @dataclass

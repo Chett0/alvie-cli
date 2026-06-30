@@ -15,7 +15,7 @@ from typing import IO
 
 from utils import load_output_symbols
 from output_models import ParsedHypothesis, ParsedRun, ParsedStep, ParsedSymbol
-from flows import ConfigArg
+from flows import ConfigArg, is_debug_enabled
 
 RESET = "\033[0m"
 BOLD = "\033[1m"
@@ -56,10 +56,21 @@ DEBUG_REQUIRES_RAW_OUTPUT_ERROR = (
 RUN_SEPARATOR_RE = re.compile(r"\x1b\[1;33m.")
 COLOR_SEPARATOR_RE = re.compile(r"\x1b\[([0-9;]*)m|([^\x1b]+)", re.DOTALL)
 
+LOGO_LINES = [
+    " █████╗  ██╗     ██╗   ██╗ ██╗ ███████╗       ██████╗ ██╗     ██╗",
+    "██╔══██╗ ██║     ██║   ██║ ██║ ██╔════╝      ██╔════╝ ██║     ██║",
+    "███████║ ██║     ██║   ██║ ██║ █████╗        ██║      ██║     ██║",
+    "██╔══██║ ██║     ╚██╗ ██╔╝ ██║ ██╔══╝        ██║      ██║     ██║",
+    "██║  ██║ ███████╗ ╚████╔╝  ██║ ███████╗      ╚██████╗ ███████╗██║",
+    "╚═╝  ╚═╝ ╚══════╝  ╚═══╝   ╚═╝ ╚══════╝       ╚═════╝ ╚══════╝╚═╝",
+]
 
-def debug_enabled(args: list[ConfigArg]) -> bool:
-    """Return whether an ALVIE argument list enables debug logging."""
-    return any(arg.flag == "--debug" for arg in args)
+# Gradient endpoints (blue -> cyan).
+GRADIENT_START = (80, 150, 255)
+GRADIENT_END = (110, 230, 220)
+
+TAGLINE = "Interface for the Alvie analysis tool"
+TIP = "Pick an action below  ·  Ctrl+C to exit"
 
 
 def color_from_sgr(sgr_code: str) -> str | None:
@@ -74,6 +85,19 @@ def color_from_sgr(sgr_code: str) -> str | None:
 
 def _supports_color() -> bool:
     return sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
+
+
+def _truecolor(r: int, g: int, b: int) -> str:
+    return f"\033[38;2;{r};{g};{b}m"
+
+
+def _gradient_line(text: str, ratio: float) -> str:
+    sr, sg, sb = GRADIENT_START
+    er, eg, eb = GRADIENT_END
+    r = round(sr + (er - sr) * ratio)
+    g = round(sg + (eg - sg) * ratio)
+    b = round(sb + (eb - sb) * ratio)
+    return f"{BOLD}{_truecolor(r, g, b)}{text}{RESET}"
 
 
 def _style(text: str, *codes: str) -> str:
@@ -333,7 +357,7 @@ class AlvieExecution:
     def run(self) -> None:
         """Run the ALVIE execution with the specified output mode"""
         try:
-            if debug_enabled(self.args) and self.parsed_output_path is not None:
+            if is_debug_enabled(self.args) and self.parsed_output_path is not None:
                 raise ValueError(DEBUG_PARSED_OUTPUT_ERROR)
 
             self._open_output_file()
@@ -363,136 +387,14 @@ class AlvieExecution:
         """Run ALVIE execution with sequential output to the terminal"""
         self._print_header()
         self._process = None
-        self._spinner = None
+
         self._spinner = Spinner("Executing ALVIE").start()
         self.run()
-
         success("Alvie finished successfully.\n")
 
 
-    def _open_output_file(self) -> None:
-        """Open the output file for writing when an output path is provided."""
-        self._output_file = None
-        if not self.output_path:
-            return
-        try:
-            self.output_path.parent.mkdir(parents=True, exist_ok=True)
-            self._output_file = self.output_path.open("w", encoding="utf-8")
-        except OSError as exc:
-            warn(f"Could not open output file, writing to terminal instead: {exc}\n")
-            self._output_file = None
-
-    def _close_output_file(self) -> None:
-        """Close the output file"""
-        if not self._output_file:
-            return
-        self._write_footer()
-        self._output_file.close()
-        self._output_file = None
-        if not self.parallel:
-            info(f"Output saved to {_style(str(self.output_path), CYAN, BOLD)}\n")
-
-    def _write_header(self) -> None:
-        """Write a header with execution information to the output file."""
-        if not self._output_file:
-            return
-
-        started = (
-            self._start_time.isoformat(sep=" ", timespec="seconds")
-            if self._start_time else "unknown"
-        )
-
-        lines = [
-            "=" * 60,
-            "Start of ALVIE execution",
-            f"Executable : {self.executable}",
-            f"Path       : {self.exe}",
-            f"Output mode       : {'raw' if self.is_raw_output else 'parsed'}",
-            f"Started    : {started}",
-            "Arguments  :",
-        ]
-        if self.args:
-            for arg in self.args:
-                if arg.value is not None:
-                    lines.append(f"  {arg.flag}: {arg.value}")
-                else:
-                    lines.append(f"  {arg.flag}")
-        else:
-            lines.append("  (no arguments)")
-        lines.append("=" * 60)
-
-        self._write("\n".join(lines) + "\n")
-
-    def _write_footer(self) -> None:
-        """Write a footer with execution timing to the output file."""
-        if not self._output_file:
-            return
-
-        ended = (
-            self._end_time.isoformat(sep=" ", timespec="seconds")
-            if self._end_time else "unknown"
-        )
-
-        lines = [
-            "=" * 60,
-            "End of ALVIE execution",
-            f"Finished   : {ended}",
-        ]
-        if self._start_time and self._end_time:
-            lines.append(f"Duration   : {self._end_time - self._start_time}")
-        lines.append("=" * 60)
-
-        self._write("\n" + "\n".join(lines) + "\n")
-
-    def _write(
-            self, 
-            text: str = "", 
-            end: str = "\n", 
-            flush: bool = False,
-        ) -> None:
-        """Write produced output to the output file when set, otherwise to the terminal."""
-
-        if self._output_file:
-            self._output_file.write(f"{text}{end}")
-        else:
-            print(text, end=end, flush=flush)
-
-    def _print_header(self) -> None:
-        print()
-        info(f"Running {_style(self.executable, CYAN, BOLD)}")
-        hint(f"  {self.exe}\n")
-        if self.args:
-            info("Arguments:")
-            for arg in self.args:
-                if arg.value:
-                    print(f"\t{_style(arg.flag, CYAN)}: {arg.value}")
-                else:
-                    print(f"\t{_style(arg.flag, CYAN)}")
-        else:
-            hint("  (no arguments)")
-        hint("\nPress Ctrl+C to stop the execution.")
-        print()
-
-    def _get_alvie_process(self) -> tuple[subprocess.Popen, IO[str]]:
-        """Return the ALVIE process and its stdout stream"""
-        process = subprocess.Popen(
-            self.command,
-            cwd=self.alvie_path,
-            stdout=subprocess.PIPE,
-            stderr=None,
-            text=True,
-        )
-
-        if not process:
-            raise RuntimeError("Alvie process could not be started.")
-        
-        if not process.stdout:
-            raise RuntimeError("No output from Alvie process.")
-        
-        return process, process.stdout
-
-
     def _run_raw(self) -> None:
+        """Run the ALVIE execution and stream its raw output to the terminal or file."""
         try:
             self._process, stdout = self._get_alvie_process()
             received_output = False
@@ -502,6 +404,7 @@ class AlvieExecution:
                     received_output = True
                 self._write(line, end="", flush=True)
 
+            self._write("\n\n")
             self._process.wait()
             self._end_time = datetime.now()
 
@@ -510,7 +413,9 @@ class AlvieExecution:
         finally:
             self._stop_spinner()
 
+
     def _run_parsed(self) -> None:
+        """Run the ALVIE execution and parse its output."""
         self._process, stdout = self._get_alvie_process()
 
         symbols = load_output_symbols()
@@ -555,29 +460,91 @@ class AlvieExecution:
         # self._write(format_recap(output_symbols, output_counts, hypotheses_count, runs_count, steps_count))
         self._save_parsed_output(parsed_hypotheses, output_counts, hypotheses_count, runs_count, steps_count)
 
-    def _stop_spinner(self) -> None:
-        if self._spinner:
-            self._spinner.stop()
-            self._spinner = None
 
-    def _terminate(self, force: bool = False) -> None:
-        """Stop the running Alvie process, escalating to a kill if it does not exit."""
-        process = self._process
-        if process is None or process.poll() is not None:
+    def _print_header(self) -> None:
+        print()
+        info(f"Running {_style(self.executable, CYAN, BOLD)}")
+        hint(f"  {self.exe}\n")
+        if self.args:
+            info("Arguments:")
+            for arg in self.args:
+                if arg.value:
+                    print(f"\t{_style(arg.flag, CYAN)}: {arg.value}")
+                else:
+                    print(f"\t{_style(arg.flag, CYAN)}")
+        else:
+            hint("  (no arguments)")
+        hint("\nPress Ctrl+C to stop the execution.")
+        print()
+
+
+    def _write_header(self) -> None:
+        """Write a header with execution information to the output file."""
+        if not self._output_file:
             return
 
-        if force:
-            # ctrl+c sends SIGKILL to the process
-            process.kill()
+        started = (
+            self._start_time.isoformat(sep=" ", timespec="seconds")
+            if self._start_time else "unknown"
+        )
+
+        lines = [
+            "=" * 60,
+            "Start of ALVIE execution",
+            f"Executable : {self.executable}",
+            f"Path       : {self.exe}",
+            f"Output mode       : {'raw' if self.is_raw_output else 'parsed'}",
+            f"Started    : {started}",
+            "Arguments  :",
+        ]
+        if self.args:
+            for arg in self.args:
+                if arg.value is not None:
+                    lines.append(f"  {arg.flag}: {arg.value}")
+                else:
+                    lines.append(f"  {arg.flag}")
         else:
-            # graceful shutdown with SIGTERM, then escalate to SIGKILL if it does not exit
-            process.terminate()
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                warn("Alvie did not stop in time, forcing termination.\n")
-                process.kill()
-                process.wait()
+            lines.append("  (no arguments)")
+        lines.append("=" * 60)
+
+        self._write("\n".join(lines) + "\n")
+
+
+    def _write_footer(self) -> None:
+        """Write a footer with execution timing to the output file."""
+        if not self._output_file:
+            return
+
+        ended = (
+            self._end_time.isoformat(sep=" ", timespec="seconds")
+            if self._end_time else "unknown"
+        )
+
+        lines = [
+            "=" * 60,
+            "End of ALVIE execution",
+            f"Finished   : {ended}",
+        ]
+        if self._start_time and self._end_time:
+            lines.append(f"Duration   : {self._end_time - self._start_time}")
+        lines.append("=" * 60)
+
+        self._write("\n" + "\n".join(lines) + "\n")
+
+
+    def _write(
+            self, 
+            text: str = "", 
+            end: str = "\n", 
+            flush: bool = False,
+        ) -> None:
+        """Write produced output to the output file when set, otherwise to the terminal."""
+
+        if self._output_file:
+            self._output_file.write(f"{text}{end}")
+        else:
+            print(text, end=end, flush=flush)
+
 
     def _save_parsed_output(
         self,
@@ -602,6 +569,31 @@ class AlvieExecution:
                 info(f"Parsed output saved to {_style(str(self.parsed_output_path), CYAN, BOLD)}\n")
         except OSError as exc:
             warn(f"Could not save parsed output JSON: {exc}\n")
+
+
+    def _open_output_file(self) -> None:
+        """Open the output file for writing when an output path is provided."""
+        self._output_file = None
+        if not self.output_path:
+            return
+        try:
+            self.output_path.parent.mkdir(parents=True, exist_ok=True)
+            self._output_file = self.output_path.open("w", encoding="utf-8")
+        except OSError as exc:
+            warn(f"Could not open output file, writing to terminal instead: {exc}\n")
+            self._output_file = None
+
+
+    def _close_output_file(self) -> None:
+        """Close the output file"""
+        if not self._output_file:
+            return
+        self._write_footer()
+        self._output_file.close()
+        self._output_file = None
+        if not self.parallel:
+            info(f"Output saved to {_style(str(self.output_path), CYAN, BOLD)}\n")
+
 
     def _build_output_json(
         self,
@@ -633,6 +625,51 @@ class AlvieExecution:
             },
             "hypotheses": [hypothesis.to_dict() for hypothesis in hypotheses],
         }
+
+
+    def _get_alvie_process(self) -> tuple[subprocess.Popen, IO[str]]:
+        """Return the ALVIE process and its stdout stream"""
+        process = subprocess.Popen(
+            self.command,
+            cwd=self.alvie_path,
+            stdout=subprocess.PIPE,
+            stderr=None,
+            text=True,
+        )
+
+        if not process:
+            raise RuntimeError("Alvie process could not be started.")
+        
+        if not process.stdout:
+            raise RuntimeError("No output from Alvie process.")
+        
+        return process, process.stdout
+
+
+    def _stop_spinner(self) -> None:
+        if self._spinner:
+            self._spinner.stop()
+            self._spinner = None
+
+
+    def _terminate(self, force: bool = False) -> None:
+        """Stop the running Alvie process, escalating to a kill if it does not exit."""
+        process = self._process
+        if process is None or process.poll() is not None:
+            return
+
+        if force:
+            # ctrl+c sends SIGKILL to the process
+            process.kill()
+        else:
+            # graceful shutdown with SIGTERM, then escalate to SIGKILL if it does not exit
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                warn("Alvie did not stop in time, forcing termination.\n")
+                process.kill()
+                process.wait()
 
 
 def format_recap(
@@ -838,3 +875,41 @@ def remove_tmp_files(
                 os.unlink(temp_path)
             except OSError:
                 pass
+
+
+def print_banner() -> None:
+    """Print the Alvie CLI welcome banner."""
+    color = _supports_color()
+    width = max(len(line) for line in LOGO_LINES)
+    pad = "  "
+
+    print()
+    for i, line in enumerate(LOGO_LINES):
+        ratio = i / (len(LOGO_LINES) - 1)
+        rendered = _gradient_line(line, ratio) if color else line
+        print(f"{pad}{rendered}")
+    print()
+
+    # Rounded info box, sized to the widest content line (logo or text).
+    box_texts = ["✻ Welcome to Alvie CLI", "", TAGLINE, TIP]
+    inner = max(width, *(len(t) for t in box_texts))
+    top = f"╭{'─' * (inner + 2)}╮"
+    bottom = f"╰{'─' * (inner + 2)}╯"
+
+    def box_line(text: str, *, accent: bool = False) -> str:
+        body = f"│ {text.ljust(inner)} │"
+        if not color:
+            return f"{pad}{body}"
+        style = BOLD if accent else DIM
+        return f"{pad}{DIM}│{RESET} {style}{text.ljust(inner)}{RESET} {DIM}│{RESET}"
+
+    edge = f"{pad}{DIM}{top}{RESET}" if color else f"{pad}{top}"
+    edge_b = f"{pad}{DIM}{bottom}{RESET}" if color else f"{pad}{bottom}"
+
+    print(edge)
+    print(box_line("✻ Welcome to Alvie CLI", accent=True))
+    print(box_line(""))
+    print(box_line(TAGLINE))
+    print(box_line(TIP))
+    print(edge_b)
+    print()

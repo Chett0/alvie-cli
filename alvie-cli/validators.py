@@ -1,4 +1,3 @@
-from enum import Enum
 from pathlib import Path
 
 from InquirerPy.separator import Separator

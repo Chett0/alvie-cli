@@ -12,10 +12,10 @@ from prompt_toolkit.validation import ValidationError
 
 from commands import Command, Argument, ConfigCommand
 from utils import DONE_CHOICE, get_alvie_code_path, is_done, load_args, load_commands, validate_save_path
-from output import AlvieExecution, DEBUG_PARSED_OUTPUT_ERROR, debug_enabled
+from output import AlvieExecution, DEBUG_PARSED_OUTPUT_ERROR
 from entities import build_choices
 from validators import FileExtensionValidator
-from flows import Flow, StepOutput, StepResult, CommandState, ConfigArg, create_prompt
+from flows import Flow, StepOutput, StepResult, CommandState, ConfigArg, create_prompt, is_debug_enabled
 
 
 ALVIE_PATH = get_alvie_code_path()
@@ -228,7 +228,7 @@ def select_output_mode(state: CommandState) -> StepOutput:
     
 
 def select_json_output_path(state: CommandState) -> StepOutput:
-    if debug_enabled(state.args):
+    if is_debug_enabled(state.args):
         print(DEBUG_PARSED_OUTPUT_ERROR)
         return StepOutput.back()
 
@@ -255,7 +255,7 @@ def execute_alvie(state: CommandState) -> StepOutput:
         args=state.args,
         is_raw_output=state.raw_output,
         parsed_output_path=state.parsed_output_path,
-    ).run()
+    ).run_seq()
 
     return StepOutput.next()
 
