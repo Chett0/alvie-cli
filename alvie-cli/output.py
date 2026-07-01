@@ -14,7 +14,6 @@ import shutil
 from typing import IO
 
 from utils import load_output_symbols
-from output_models import ParsedHypothesis, ParsedRun, ParsedStep, ParsedSymbol
 from flows import ConfigArg, is_debug_enabled
 
 RESET = "\033[0m"
@@ -46,15 +45,15 @@ ACTORS : dict[str, str] = {
     "red": "Reset",
 }
 
+RUN_SEPARATOR_RE = re.compile(r"\x1b\[1;33m.")
+COLOR_SEPARATOR_RE = re.compile(r"\x1b\[([0-9;]*)m|([^\x1b]+)", re.DOTALL)
+
 DEBUG_PARSED_OUTPUT_ERROR = (
     "Cannot use --debug together with --parsed-output."
 )
 DEBUG_REQUIRES_RAW_OUTPUT_ERROR = (
     "Alvie's --debug output cannot be parsed reliably. Use --raw-output (-r)."
 )
-
-RUN_SEPARATOR_RE = re.compile(r"\x1b\[1;33m.")
-COLOR_SEPARATOR_RE = re.compile(r"\x1b\[([0-9;]*)m|([^\x1b]+)", re.DOTALL)
 
 LOGO_LINES = [
     " █████╗  ██╗     ██╗   ██╗ ██╗ ███████╗       ██████╗ ██╗     ██╗",
@@ -73,7 +72,11 @@ TAGLINE = "Interface for the Alvie analysis tool"
 TIP = "Pick an action below  ·  Ctrl+C to exit"
 
 
-def color_from_sgr(sgr_code: str) -> str | None:
+def _supports_color() -> bool:
+    return sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
+
+
+def _color_from_sgr(sgr_code: str) -> str | None:
     """Return the semantic color from a plain or styled ANSI SGR code."""
     for code in reversed(sgr_code.split(";")):
         color = SGR_TO_COLOR.get(code)
@@ -81,10 +84,6 @@ def color_from_sgr(sgr_code: str) -> str | None:
             return color
 
     return None
-
-
-def _supports_color() -> bool:
-    return sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
 
 
 def _truecolor(r: int, g: int, b: int) -> str:
@@ -315,6 +314,251 @@ class ParallelDashboard:
 
 
 @dataclass
+class ParsedOutput:
+    parsed_hypotheses: list["ParsedHypothesis"] = field(default_factory=list)
+    output_counts: Counter[str] = field(default_factory=Counter)
+
+    hypotheses_count: int = field(init=False, default=0)
+    runs_count: int = field(init=False, default=0)
+    steps_count: int = field(init=False, default=0)
+
+
+@dataclass 
+class SymbolParser:
+    input_symbols: dict
+    output_symbols: dict
+
+    def format_recap(
+        self,
+        output: ParsedOutput
+    ) -> str:
+        """Format the total occurrences of number of hypotheses, runs, steps and output symbol."""
+        
+        lines = [
+            "Recap\n",
+            f"\tHypotheses: {output.hypotheses_count}",
+            f"\tRuns: {output.runs_count}",
+            f"\tSteps: {output.steps_count}",
+            "\n\tOutputs:",
+        ]
+        
+        # show only output symbols with non-zero occurrences
+        for symbol, data in self.output_symbols.items():
+            if output.output_counts[symbol] > 0:
+                lines.append(f"\t- {data['name']} ({symbol}): {output.output_counts[symbol]}")
+        return "\n".join(lines) + "\n"
+
+
+@dataclass 
+class ParsedSymbol:
+    symbol: str
+    name: str
+    description: str
+    actor: str
+    color: str | None
+
+    # JSON parser: attacker, enclave share some input symbols, so we distinguish them by actor
+    def to_input_dict(self) -> dict:
+        return {
+            "symbol": self.symbol,
+            "actor": self.actor,
+        }
+
+    def format(self) -> str:
+        """Format a parsed input or output symbol."""
+        return f"{self.actor}: {self.name} ({self.symbol})"
+    
+    @classmethod
+    def parse(
+        cls,
+        actor: str | None,
+        color: str | None,
+        symbol: str,
+        symbol_data: dict,
+    ) -> "ParsedSymbol":
+        """Build a parsed symbol from the config entry and active ANSI color."""
+        return ParsedSymbol(
+            symbol=symbol,
+            name=symbol_data["name"],
+            description=symbol_data["description"],
+            actor=actor or "Unknown actor",
+            color=color,
+        )
+
+
+@dataclass
+class ParsedStep:
+    # create a new list for each instance
+    # [] would create a single shared list by all instances
+    inputs: list[ParsedSymbol] = field(default_factory=list)
+    outputs: list[ParsedSymbol] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            "inputs": [symbol.to_input_dict() for symbol in self.inputs],
+            "outputs": [symbol.symbol for symbol in self.outputs],
+        }
+    
+    def format(self) -> str:
+        """Format a step containing several input and output symbols."""
+        inputs = " & ".join(symbol.format() for symbol in self.inputs)
+        outputs = " & ".join(symbol.format() for symbol in self.outputs)
+        return f"\t{inputs} -> {outputs}\n\n"
+    
+    @classmethod
+    def tokenize(
+        cls,
+        raw: str,
+        parser: SymbolParser
+    ) -> list[str]:
+        """Split bracketed ALVIE text into delimiters and known symbols."""
+        symbols = sorted(
+            [*parser.input_symbols.keys(), *parser.output_symbols.keys()],
+            key=len,
+            reverse=True,
+        )
+        tokens: list[str] = []
+        index = 0
+
+        while index < len(raw):
+            char = raw[index]
+
+            if char.isspace():
+                index += 1
+                continue
+
+            if char in "[]":
+                tokens.append(char)
+                index += 1
+                continue
+
+            match = next((symbol for symbol in symbols if raw.startswith(symbol, index)), None)
+            if match:
+                tokens.append(match)
+                index += len(match)
+                continue
+
+            index += 1
+
+        return tokens
+
+@dataclass
+class ParsedRun:
+    steps: list[ParsedStep] = field(default_factory=list)
+
+    def to_dict(self) -> list[dict]:
+        return [step.to_dict() for step in self.steps]
+    
+    def format(self, number: int) -> str:
+        """Format a parsed run for terminal output."""
+        steps = "".join(step.format() for step in self.steps)
+        return f"Run {number}:\n{steps}"
+    
+    @classmethod
+    def parse(
+        cls, 
+        raw_run: str, 
+        parser: SymbolParser,
+        output: ParsedOutput
+    ) -> "ParsedRun":
+        """Parse one run containing several steps."""
+        steps : list[ParsedStep] = []
+        input_step : list[ParsedSymbol] = []
+        output_step : list[ParsedSymbol] = []    
+        actor: str | None = None
+        color: str | None = None
+        is_output = False
+
+        # iterate over color codes and symbols in the raw run
+        for sgr_code, text in COLOR_SEPARATOR_RE.findall(raw_run):
+            if sgr_code:
+                color = _color_from_sgr(sgr_code)
+                if not color:
+                    continue
+                
+                actor = ACTORS[color]
+            else:
+                for token in ParsedStep.tokenize(
+                    raw=text, 
+                    parser=parser
+                ):
+                    if token == "[":
+                        is_output = False
+                        continue
+
+                    if token == "]":
+                        steps.append(ParsedStep(inputs=input_step.copy(), outputs=output_step.copy()))
+                        input_step.clear()
+                        output_step.clear()
+                        actor = None
+                        color = None
+                        is_output = False
+                        continue
+
+                    if is_output:
+                        output_symbol = parser.output_symbols.get(token, None)
+                        if output_symbol:
+                            output_step.append(
+                                ParsedSymbol.parse(
+                                    actor=actor, 
+                                    color=color, 
+                                    symbol=token, 
+                                    symbol_data=output_symbol
+                                ))
+                            output.output_counts[token] += 1
+                    else:
+                        input_symbol = parser.input_symbols.get(token, None)
+                        if input_symbol:
+                            input_step.append(
+                                ParsedSymbol.parse(
+                                    actor=actor, 
+                                    color=color, 
+                                    symbol=token, 
+                                    symbol_data=input_symbol
+                                ))
+                            is_output = True
+    
+        output.steps_count += len(steps)
+        return ParsedRun(steps=steps)
+
+
+@dataclass
+class ParsedHypothesis:
+    runs: list[ParsedRun] = field(default_factory=list)
+
+    def to_dict(self) -> list[list[dict]]:
+        return [run.to_dict() for run in self.runs]
+    
+    def format(self) -> str:
+        """Format a parsed hypothesis for terminal output."""
+        return "".join(
+            run.format(run_number)
+            for run_number, run in enumerate(self.runs, start=1)
+        )
+    
+    @classmethod
+    def parse(
+        cls, 
+        raw : str, 
+        parser : SymbolParser,
+        output: ParsedOutput
+    ) -> "ParsedHypothesis":
+        """Parse one hypothesis containing several runs."""
+        runs: list[ParsedRun] = []
+
+        raw_runs = [raw_run for raw_run in RUN_SEPARATOR_RE.split(raw) if raw_run]
+        for raw_run in raw_runs:
+            runs.append(ParsedRun.parse(
+                raw_run=raw_run,
+                parser=parser,
+                output=output
+            ))
+        
+        output.runs_count += len(runs)
+        return ParsedHypothesis(runs=runs)
+
+
+@dataclass
 class AlvieExecution:
     """A single ALVIE execution with its arguments and output settings."""
 
@@ -362,7 +606,7 @@ class AlvieExecution:
 
             self._open_output_file()
             self._start_time = datetime.now()
-            self._write_header()
+            self._write_header()    
 
             if self.is_raw_output:
                 self._run_raw()
@@ -420,20 +664,23 @@ class AlvieExecution:
 
         symbols = load_output_symbols()
         input_symbols, output_symbols = symbols["inputs"], symbols["outputs"]
-        output_counts: Counter[str] = Counter()
-        parsed_hypotheses: list[ParsedHypothesis] = []
+        parser = SymbolParser(
+            input_symbols=input_symbols,
+            output_symbols=output_symbols
+        )
+
+        output = ParsedOutput()
 
         for i, line in enumerate(stdout):
             if line.strip():
                 self._stop_spinner()
-                hypothesis = parse_hypothesis(
-                    raw_hypothesis=line.strip(),
-                    input_symbols=input_symbols,
-                    output_symbols=output_symbols,
-                    output_counts=output_counts,
+                hypothesis = ParsedHypothesis.parse(
+                    raw=line.strip(),
+                    parser=parser,
+                    output=output
                 )
-                parsed_hypotheses.append(hypothesis)
-                # formatted_hypothesis = format_hypothesis(hypothesis)
+                output.parsed_hypotheses.append(hypothesis)
+                # formatted_hypothesis = hypothesis.format()
                 # self._write(f"Hypothesis {i+1}\n", formatted_hypothesis, flush=True)
                 if not self.parallel:
                     self._spinner = Spinner(f"Waiting for the next hypothesis {i+2}").start()
@@ -444,21 +691,10 @@ class AlvieExecution:
 
         if self._process.returncode != 0:
             raise subprocess.CalledProcessError(self._process.returncode, self.exe)
-        
-        # Count tot number of hypotheses, runs and steps
-        hypotheses_count = len(parsed_hypotheses)
-        runs_count = sum(
-            len(hypothesis.runs)
-            for hypothesis in parsed_hypotheses
-        )
-        steps_count = sum(
-            len(run.steps)
-            for hypothesis in parsed_hypotheses
-            for run in hypothesis.runs
-        )
 
-        # self._write(format_recap(output_symbols, output_counts, hypotheses_count, runs_count, steps_count))
-        self._save_parsed_output(parsed_hypotheses, output_counts, hypotheses_count, runs_count, steps_count)
+        output.hypotheses_count = len(output.parsed_hypotheses)
+        # self._write(parser.format_recap(output=output), flush=True)
+        self._save_parsed_output(output=output)
 
 
     def _print_header(self) -> None:
@@ -548,17 +784,13 @@ class AlvieExecution:
 
     def _save_parsed_output(
         self,
-        hypotheses: list[ParsedHypothesis],
-        output_counts: Counter[str],
-        hypotheses_count: int,
-        runs_count: int,
-        steps_count: int
+        output: ParsedOutput,
     ) -> None:
         """Save parsed output as JSON when an output path is provided."""
         if not self.parsed_output_path:
             return
 
-        output_data = self._build_output_json(hypotheses, output_counts, hypotheses_count, runs_count, steps_count)
+        output_data = self._build_output_json(output=output)
 
         try:
             self.parsed_output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -597,11 +829,7 @@ class AlvieExecution:
 
     def _build_output_json(
         self,
-        hypotheses: list[ParsedHypothesis],
-        output_counts: Counter[str],
-        hypotheses_count: int,
-        runs_count: int,
-        steps_count: int
+        output: ParsedOutput,
     ) -> dict:
         """Build the JSON-serializable parsed output document."""
         return {
@@ -616,14 +844,14 @@ class AlvieExecution:
             "end": self._end_time.isoformat() if self._end_time else None,
             "recap": {
                 symbol: count
-                for symbol, count in output_counts.items()
+                for symbol, count in output.output_counts.items()
                 if count > 0
             } | {
-                "hypotheses": hypotheses_count,
-                "runs": runs_count,
-                "steps": steps_count
+                "hypotheses": output.hypotheses_count,
+                "runs": output.runs_count,
+                "steps": output.steps_count
             },
-            "hypotheses": [hypothesis.to_dict() for hypothesis in hypotheses],
+            "hypotheses": [hypothesis.to_dict() for hypothesis in output.parsed_hypotheses],
         }
 
 
@@ -670,186 +898,6 @@ class AlvieExecution:
                 warn("Alvie did not stop in time, forcing termination.\n")
                 process.kill()
                 process.wait()
-
-
-def format_recap(
-        output_symbols: dict,
-        output_counts: Counter[str],
-        hypotheses_count: int,
-        runs_count: int,
-        steps_count: int,
-) -> str:
-    """Format the total occurrences of number of hypotheses, runs, steps and output symbol."""
-    
-    lines = [
-        "Recap\n",
-        f"\tHypotheses: {hypotheses_count}",
-        f"\tRuns: {runs_count}",
-        f"\tSteps: {steps_count}",
-        "\n\tOutputs:",
-    ]
-    
-    # show only output symbols with non-zero occurrences
-    
-    for symbol, data in output_symbols.items():
-        if output_counts[symbol] > 0:
-            lines.append(f"\t- {data['name']} ({symbol}): {output_counts[symbol]}")
-    return "\n".join(lines) + "\n"
-
-
-def parse_hypothesis(
-        raw_hypothesis: str,
-        input_symbols: dict,
-        output_symbols: dict,
-        output_counts: Counter[str],
-) -> ParsedHypothesis:
-    """Parse one hypothesis containing several runs."""
-    runs: list[ParsedRun] = []
-
-    raw_runs = [raw_run for raw_run in RUN_SEPARATOR_RE.split(raw_hypothesis) if raw_run]
-    for raw_run in raw_runs:
-        runs.append(parse_run(
-            raw_run=raw_run,
-            input_symbols=input_symbols,
-            output_symbols=output_symbols,
-            output_counts=output_counts,
-        ))
-
-    return ParsedHypothesis(runs=runs)
-
-
-def parse_run(
-        raw_run: str,
-        input_symbols: dict,
-        output_symbols: dict,
-        output_counts: Counter[str],
-) -> ParsedRun:
-    """Parse one run containing several steps."""
-    steps : list[ParsedStep] = []
-    input_step : list[ParsedSymbol] = []
-    output_step : list[ParsedSymbol] = []    
-    actor: str | None = None
-    color: str | None = None
-    is_output = False
-
-    # iterate over color codes and symbols in the raw run
-    for sgr_code, text in COLOR_SEPARATOR_RE.findall(raw_run):
-        if sgr_code:
-            color = color_from_sgr(sgr_code)
-            if not color:
-                continue
-            
-            actor = ACTORS[color]
-        else:
-            for token in tokenize_step_text(text, input_symbols, output_symbols):
-                if token == "[":
-                    is_output = False
-                    continue
-
-                if token == "]":
-                    steps.append(ParsedStep(inputs=input_step.copy(), outputs=output_step.copy()))
-                    input_step.clear()
-                    output_step.clear()
-                    actor = None
-                    color = None
-                    is_output = False
-                    continue
-
-                if is_output:
-                    output_symbol = output_symbols.get(token, None)
-                    if output_symbol:
-                        output_step.append(parse_symbol(actor, color, token, output_symbol))
-                        output_counts[token] += 1
-                else:
-                    input_symbol = input_symbols.get(token, None)
-                    if input_symbol:
-                        input_step.append(parse_symbol(actor, color, token, input_symbol))
-                        is_output = True
-    
-    return ParsedRun(steps=steps)
-
-
-def tokenize_step_text(
-        text: str,
-        input_symbols: dict,
-        output_symbols: dict,
-) -> list[str]:
-    """Split bracketed ALVIE text into delimiters and known symbols."""
-    symbols = sorted(
-        [*input_symbols.keys(), *output_symbols.keys()],
-        key=len,
-        reverse=True,
-    )
-    tokens: list[str] = []
-    index = 0
-
-    while index < len(text):
-        char = text[index]
-
-        if char.isspace():
-            index += 1
-            continue
-
-        if char in "[]":
-            tokens.append(char)
-            index += 1
-            continue
-
-        match = next((symbol for symbol in symbols if text.startswith(symbol, index)), None)
-        if match:
-            tokens.append(match)
-            index += len(match)
-            continue
-
-        index += 1
-
-    return tokens
-
-
-def parse_symbol(
-        actor: str | None,
-        color: str | None,
-        symbol: str,
-        symbol_data: dict,
-) -> ParsedSymbol:
-    """Build a parsed symbol from the config entry and active ANSI color."""
-    return ParsedSymbol(
-        symbol=symbol,
-        name=symbol_data["name"],
-        description=symbol_data["description"],
-        actor=actor or "Unknown actor",
-        color=color,
-    )
-
-
-def format_hypothesis(hypothesis: ParsedHypothesis) -> str:
-    """Format a parsed hypothesis for terminal output."""
-    return "".join(
-        format_run(run, run_number)
-        for run_number, run in enumerate(hypothesis.runs, start=1)
-    )
-
-
-def format_run(run: ParsedRun, number: int) -> str:
-    """Format a parsed run for terminal output."""
-    steps = "".join(format_step(step) for step in run.steps)
-    return f"Run {number}:\n{steps}"
-
-
-def format_step(
-        step: ParsedStep
-) -> str:
-    """Format a step containing several input and output symbols."""
-    inputs = " & ".join(format_symbol(symbol) for symbol in step.inputs)
-    outputs = " & ".join(format_symbol(symbol) for symbol in step.outputs)
-    return f"\t{inputs} -> {outputs}\n\n"
-
-
-def format_symbol(
-        symbol: ParsedSymbol
-) -> str:
-    """Format a parsed input or output symbol."""
-    return f"{symbol.actor}: {symbol.name} ({symbol.symbol})"
 
 
 def merge_tmp_file(
