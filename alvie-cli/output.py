@@ -313,6 +313,12 @@ class ParallelDashboard:
             self._rendered_lines = len(lines)
 
 
+@dataclass 
+class SymbolParser:
+    input_symbols: dict
+    output_symbols: dict
+
+
 @dataclass
 class ParsedOutput:
     parsed_hypotheses: list["ParsedHypothesis"] = field(default_factory=list)
@@ -322,30 +328,24 @@ class ParsedOutput:
     runs_count: int = field(init=False, default=0)
     steps_count: int = field(init=False, default=0)
 
-
-@dataclass 
-class SymbolParser:
-    input_symbols: dict
-    output_symbols: dict
-
     def format_recap(
         self,
-        output: ParsedOutput
+        parser: SymbolParser
     ) -> str:
         """Format the total occurrences of number of hypotheses, runs, steps and output symbol."""
         
         lines = [
             "Recap\n",
-            f"\tHypotheses: {output.hypotheses_count}",
-            f"\tRuns: {output.runs_count}",
-            f"\tSteps: {output.steps_count}",
+            f"\tHypotheses: {self.hypotheses_count}",
+            f"\tRuns: {self.runs_count}",
+            f"\tSteps: {self.steps_count}",
             "\n\tOutputs:",
         ]
         
         # show only output symbols with non-zero occurrences
-        for symbol, data in self.output_symbols.items():
-            if output.output_counts[symbol] > 0:
-                lines.append(f"\t- {data['name']} ({symbol}): {output.output_counts[symbol]}")
+        for symbol, data in parser.output_symbols.items():
+            if self.output_counts[symbol] > 0:
+                lines.append(f"\t- {data['name']} ({symbol}): {self.output_counts[symbol]}")
         return "\n".join(lines) + "\n"
 
 
@@ -680,8 +680,10 @@ class AlvieExecution:
                     output=output
                 )
                 output.parsed_hypotheses.append(hypothesis)
-                # formatted_hypothesis = hypothesis.format()
-                # self._write(f"Hypothesis {i+1}\n", formatted_hypothesis, flush=True)
+                # non-raw output is written only if an output file is specified, otherwise only the recap is printed to the terminal
+                if self._output_file:
+                    formatted_hypothesis = hypothesis.format()
+                    self._write(f"Hypothesis {i+1}\n", formatted_hypothesis, flush=True)
                 if not self.parallel:
                     self._spinner = Spinner(f"Waiting for the next hypothesis {i+2}").start()
 
@@ -693,7 +695,8 @@ class AlvieExecution:
             raise subprocess.CalledProcessError(self._process.returncode, self.exe)
 
         output.hypotheses_count = len(output.parsed_hypotheses)
-        # self._write(parser.format_recap(output=output), flush=True)
+        if not self.parallel:
+            self._write(output.format_recap(parser=parser), flush=True)
         self._save_parsed_output(output=output)
 
 

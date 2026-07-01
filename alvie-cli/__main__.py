@@ -174,8 +174,9 @@ def run_non_interactive(argv: list[str]) -> None:
     if namespace.njobs < 1:
         parser.error("--njobs must be a positive integer")
 
-    if namespace.njobs > 1 and not namespace.parsed_output and namespace.output is None:
-            parser.error("--njobs > 1 requires --output to be specified")
+    # parallel execution requires at least one output file, terminal output is not supported
+    if namespace.njobs > 1 and not namespace.parsed_output and not namespace.output:
+            parser.error("--njobs > 1 requires --output or --parsed-output to be specified")
 
     if not namespace.configs:
         parser.error("No configuration files provided")
