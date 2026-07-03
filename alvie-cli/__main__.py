@@ -1,4 +1,6 @@
 import argparse
+from email import errors
+from io import TextIOWrapper
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import sys
@@ -61,31 +63,40 @@ def run_parallel(
         dashboard.set_running(index)
         try:
             execution.run()
+            dashboard.set_done(index)
         except BaseException:
             dashboard.set_failed(index)
             raise
-        dashboard.set_done(index)
 
+    def run(merged : TextIOWrapper | None = None) -> None:
+        """Run all executions in parallel, merging their outputs into `merged` as they complete."""
+        with dashboard:
+            with ThreadPoolExecutor(max_workers=njobs) as executor:
+                futures = {
+                    executor.submit(run_tracked, index, execution): execution
+                    for index, execution in enumerate(executions)
+                }
+
+                errors = []
+                # Merge temp files as they complete, in completion order
+                for future in as_completed(futures):
+                    try:
+                        future.result()
+                    except Exception as exc:  # noqa: BLE001
+                        errors.append((futures[future], exc))
+                        continue
+                    if merged:
+                        merge_tmp_file(merged, futures[future].output_path)
+
+                for execution, exc in errors:
+                    print(f"\nError during execution of {execution.executable}: {exc}\n")   
+                    
     try:
         if output_path:
             with output_path.open("w", encoding="utf-8") as merged:
-                with dashboard:
-                    with ThreadPoolExecutor(max_workers=njobs) as executor:
-                        futures = {
-                            executor.submit(run_tracked, index, execution): execution
-                            for index, execution in enumerate(executions)
-                        }
-
-                    for future in as_completed(futures):
-                        future.result()
-                        merge_tmp_file(merged, futures[future].output_path)
+                run(merged) 
         else:
-            with dashboard:
-                with ThreadPoolExecutor(max_workers=njobs) as executor:
-                    futures = {
-                        executor.submit(run_tracked, index, execution): execution
-                        for index, execution in enumerate(executions)
-                    }
+            run()
 
         if output_path:
             print(f"\nAll executions completed. Merged output written to {output_path}\n")
