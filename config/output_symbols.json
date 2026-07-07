@@ -156,16 +156,6 @@
             "name": "OJmpOut_Handle",
             "description": "Enclave exit followed by an interrupt being handled",
             "color": "magenta"
-        },
-        "ti": {
-            "name": "OTime_JmpIn",
-            "description": "Timed observation followed by enclave entry",
-            "color": "blue"
-        },
-        "to": {
-            "name": "OTime_JmpOut",
-            "description": "Timed observation followed by enclave exit",
-            "color": "green"
         }
     }
 }

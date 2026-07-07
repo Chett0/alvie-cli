@@ -167,18 +167,6 @@
             "actor": "Attacker",
             "description": "Timed observation followed by an interrupt being handled",
             "color": "magenta"
-        },
-        "ti": {
-            "name": "OTime_JmpIn",
-            "actor": "Attacker",
-            "description": "Timed observation followed by enclave entry",
-            "color": "blue"
-        },
-        "to": {
-            "name": "OTime_JmpOut",
-            "actor": "Enclave",
-            "description": "Timed observation followed by enclave exit",
-            "color": "green"
         }
     }
 }

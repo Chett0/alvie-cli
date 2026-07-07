@@ -46,6 +46,7 @@ restart: compose-restart exec
 
 compose-restart:
 	docker compose restart $(SERVICE)
+	docker compose restart $(VIEWER_SERVICE)
 
 exec:
 	docker compose exec -it $(SERVICE) /bin/bash --rcfile $(VENV_ACTIVATE)
