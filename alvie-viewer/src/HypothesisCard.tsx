@@ -1,6 +1,19 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 
-function HypothesisCard({ index, runCount, defaultOpen = false, children }) {
+interface HypothesisCardProps {
+  index: number
+  runCount: number
+  defaultOpen?: boolean
+  children: ReactNode
+}
+
+function HypothesisCard({
+  index,
+  runCount,
+  defaultOpen = false,
+  children,
+}: HypothesisCardProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
 
   return (
@@ -20,7 +33,7 @@ function HypothesisCard({ index, runCount, defaultOpen = false, children }) {
             aria-expanded={isOpen}
           >
             <span className="d-flex justify-content-between align-items-center w-100 me-3">
-              <span>Hypothesis {index+1}</span>
+              <span>Hypothesis {index + 1}</span>
               <span className="text-secondary fw-normal fs-6">
                 {runCount} {runCount === 1 ? 'run' : 'runs'}
               </span>

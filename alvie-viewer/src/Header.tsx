@@ -1,5 +1,9 @@
-// Keep the page header presentational; App decides what opening the importer means.
-function Header({ onImportClick }) {
+interface HeaderProps {
+  onImportClick: () => void
+}
+
+// Keep the header presentational so App stays in control of the workflow.
+function Header({ onImportClick }: HeaderProps) {
   return (
     <header className="container-fluid">
       <div className="d-flex justify-content-between align-items-center p-3">

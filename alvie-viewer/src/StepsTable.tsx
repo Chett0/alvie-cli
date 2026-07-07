@@ -1,7 +1,17 @@
-import symbolCatalog from './output_symbols.json'
 import { ActorBadge, SymbolBadge } from './Badges'
+import symbolCatalog from './symbolCatalog'
+import type { RunStep } from './types'
 
-function ActionDetails({ symbol, details }) {
+interface ActionDetailsProps {
+  symbol: string
+  details?: {
+    name: string
+    description: string
+    color: string
+  }
+}
+
+function ActionDetails({ symbol, details }: ActionDetailsProps) {
   return (
     <div className="step-action">
       <div className="d-flex align-items-center flex-wrap gap-2">
@@ -16,7 +26,7 @@ function ActionDetails({ symbol, details }) {
   )
 }
 
-function StepsTable({ steps }) {
+function StepsTable({ steps }: { steps: RunStep[] }) {
   return (
     <div className="table-responsive border rounded-3">
       <table className="table steps-table align-middle mb-0">
@@ -44,7 +54,9 @@ function StepsTable({ steps }) {
 
             return outputRows.map((symbol, outputIndex) => {
               const isFirstOutput = outputIndex === 0
-              const outputDetails = symbol && symbolCatalog.outputs[symbol]
+              const outputDetails = symbol
+                ? symbolCatalog.outputs[symbol]
+                : undefined
 
               return (
                 <tr key={`${stepIndex}-${symbol ?? 'empty'}-${outputIndex}`}>

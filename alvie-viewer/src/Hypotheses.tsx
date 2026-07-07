@@ -2,26 +2,28 @@ import { useEffect, useState } from 'react'
 import HypothesisCard from './HypothesisCard'
 import RunCard from './RunCard'
 import StepsTable from './StepsTable'
+import type { IndexedHypothesis } from './types'
 
-// Pagination constants
 const HYPOTHESES_PER_PAGE = 5
 const RUNS_PER_PAGE = 10
 
-function PaginatedHypothesis({ runs, hypothesisIndex }) {
-  // Runs pagination
+interface PaginatedHypothesisProps {
+  runs: IndexedHypothesis['runs']
+  hypothesisIndex: number
+}
+
+function PaginatedHypothesis({
+  runs,
+  hypothesisIndex,
+}: PaginatedHypothesisProps) {
   const [page, setPage] = useState(1)
   const totalPages = Math.max(1, Math.ceil(runs.length / RUNS_PER_PAGE))
-  
-  // max of current available pages for filtering
-  // E.g.: current_page = 5, total_pages after filtering = 3 --> safe_page = 3
   const safePage = Math.min(page, totalPages)
 
-  // Return to the first run page when search or filters replace the run list.
   useEffect(() => {
     setPage(1)
   }, [runs])
 
-  // Render only the runs belonging to the current inner page.
   const startIndex = (safePage - 1) * RUNS_PER_PAGE
   const visibleRuns = runs.slice(startIndex, startIndex + RUNS_PER_PAGE)
 
@@ -37,7 +39,6 @@ function PaginatedHypothesis({ runs, hypothesisIndex }) {
         </RunCard>
       ))}
 
-      {/* Runs pagination */}
       {totalPages > 1 && (
         <div className="d-flex justify-content-between align-items-center pt-2">
           <button
@@ -68,8 +69,19 @@ function PaginatedHypothesis({ runs, hypothesisIndex }) {
   )
 }
 
-function Hypotheses({ hypotheses, page, onPageChange, emptyMessage = '' }) {
-  // Show no hypotheses message if hypotheses is empty
+interface HypothesesProps {
+  hypotheses: IndexedHypothesis[]
+  page: number
+  onPageChange: (page: number) => void
+  emptyMessage?: string
+}
+
+function Hypotheses({
+  hypotheses,
+  page,
+  onPageChange,
+  emptyMessage = '',
+}: HypothesesProps) {
   if (hypotheses.length === 0) {
     return emptyMessage ? (
       <div className="alert alert-info" role="status">
@@ -78,14 +90,11 @@ function Hypotheses({ hypotheses, page, onPageChange, emptyMessage = '' }) {
     ) : null
   }
 
-  // Hypotheses pagination
   const totalPages = Math.max(
     1,
     Math.ceil(hypotheses.length / HYPOTHESES_PER_PAGE),
   )
   const safePage = Math.min(page, totalPages)
-
-  // Slice after filtering so pagination always reflects the visible result set.
   const startIndex = (safePage - 1) * HYPOTHESES_PER_PAGE
   const visibleHypotheses = hypotheses.slice(
     startIndex,
@@ -102,7 +111,6 @@ function Hypotheses({ hypotheses, page, onPageChange, emptyMessage = '' }) {
         />
       ))}
 
-      {/* Pagination: show when you have more than one page */}
       {totalPages > 1 && (
         <nav
           className="row g-0 align-items-center my-4"
@@ -139,4 +147,4 @@ function Hypotheses({ hypotheses, page, onPageChange, emptyMessage = '' }) {
   )
 }
 
-export default Hypotheses;
+export default Hypotheses

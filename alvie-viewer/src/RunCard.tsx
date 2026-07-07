@@ -1,14 +1,19 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 
-function RunCard({ index, defaultOpen = false, children }) {
+interface RunCardProps {
+  index: number
+  defaultOpen?: boolean
+  children: ReactNode
+}
+
+function RunCard({ index, defaultOpen = false, children }: RunCardProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
 
   return (
     <div className="accordion run-accordion mb-2">
       <div
-        className={`accordion-item run-item ${
-          isOpen ? 'run-item-open' : ''
-        }`}
+        className={`accordion-item run-item ${isOpen ? 'run-item-open' : ''}`}
       >
         <h3 className="accordion-header">
           <button

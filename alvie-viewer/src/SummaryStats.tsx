@@ -1,9 +1,11 @@
-function SummaryStats({ recap }) {
+import type { Recap } from './types'
+
+function SummaryStats({ recap }: { recap: Recap }) {
   const stats = [
-    { label: "Hypotheses", value: recap.hypotheses },
-    { label: "Runs", value: recap.runs },
-    { label: "Steps", value: recap.steps },
-  ];
+    { label: 'Hypotheses', value: recap.hypotheses },
+    { label: 'Runs', value: recap.runs },
+    { label: 'Steps', value: recap.steps },
+  ]
 
   return (
     <div className="row g-4 mb-3">
@@ -22,7 +24,7 @@ function SummaryStats({ recap }) {
         </div>
       ))}
     </div>
-  );
+  )
 }
 
-export default SummaryStats;
+export default SummaryStats

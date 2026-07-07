@@ -16,8 +16,8 @@ services:
     command: /bin/bash --rcfile /home/alvie/venv/bin/activate
   viewer:
     build:
-      context: ./alvie-viewer
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: alvie-viewer/Dockerfile
 
     hostname: alvie-viewer
 

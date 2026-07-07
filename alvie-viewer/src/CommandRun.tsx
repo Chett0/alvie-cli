@@ -1,25 +1,25 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
+import type { CommandArgument } from './types'
 
 const RUN_DIRECTORY = '/home/alvie/alvie/code'
 const BIN_DIRECTORY = `${RUN_DIRECTORY}/_build/default/bin`
 
-// Quote values only when required so the copied command remains shell-safe.
-const quoteArgument = (value) => {
-  const text = String(value)
+const quoteArgument = (value: string) =>
+  /^[\w./:=+@%-]+$/.test(value)
+    ? value
+    : `'${value.replaceAll("'", `'"'"'`)}'`
 
-  return /^[\w./:=+@%-]+$/.test(text)
-    ? text
-    : `'${text.replaceAll("'", `'"'"'`)}'`
-}
-
-// Put each argument on a continued line for readability and direct shell pasting.
-const buildCommand = (executable, args = []) => {
+const buildCommand = (
+  executable: string,
+  args: CommandArgument[] = [],
+): string => {
   const commandParts = [
     `${BIN_DIRECTORY}/${executable}`,
     ...args.map(({ flag, value }) =>
       value === undefined || value === null || value === ''
         ? flag
-        : `${flag} ${quoteArgument(value)}`,
+        : `${flag} ${quoteArgument(String(value))}`,
     ),
   ]
 
@@ -33,11 +33,10 @@ const buildCommand = (executable, args = []) => {
     .join('\n')
 }
 
-const formatTimestamp = (timestamp) =>
+const formatTimestamp = (timestamp: string) =>
   timestamp ? timestamp.replace('T', ' ').replace(/\.\d+$/, '') : '—'
 
-// Compute the duration in seconds as end - start timestamps
-const getDuration = (start, end) => {
+const getDuration = (start: string, end: string) => {
   const durationMilliseconds = Date.parse(end) - Date.parse(start)
 
   return Number.isFinite(durationMilliseconds)
@@ -45,8 +44,7 @@ const getDuration = (start, end) => {
     : '—'
 }
 
-// Use a check mark as brief visual confirmation after a successful copy.
-function CopyIcon({ copied }) {
+function CopyIcon({ copied }: { copied: boolean }) {
   return copied ? (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -75,11 +73,21 @@ function CopyIcon({ copied }) {
   )
 }
 
-// Use the standard Clipboard API available on HTTPS and localhost.
-const writeToClipboard = (text) => navigator.clipboard.writeText(text)
+const writeToClipboard = (text: string) => navigator.clipboard.writeText(text)
 
-// Own copy feedback inside the button so it can be reused for command and path.
-function CopyButton({ value, label, className = '', children }) {
+interface CopyButtonProps {
+  value: string
+  label: string
+  className?: string
+  children?: ReactNode
+}
+
+function CopyButton({
+  value,
+  label,
+  className = '',
+  children,
+}: CopyButtonProps) {
   const [copyStatus, setCopyStatus] = useState('Copy')
 
   useEffect(() => {
@@ -101,6 +109,7 @@ function CopyButton({ value, label, className = '', children }) {
 
   const accessibleLabel =
     copyStatus === 'Copy' ? `Copy ${label}` : `${label}: ${copyStatus}`
+
   const variantClass = children
     ? copyStatus === 'Copied'
       ? 'btn-link text-success'
@@ -115,7 +124,7 @@ function CopyButton({ value, label, className = '', children }) {
     <button
       className={`btn btn-sm ${className} ${variantClass}`}
       type="button"
-      onClick={copyValue}
+      onClick={() => void copyValue()}
       aria-label={accessibleLabel}
       title={accessibleLabel}
     >
@@ -124,13 +133,19 @@ function CopyButton({ value, label, className = '', children }) {
   )
 }
 
-function CommandRun({ executable, args, start, end }) {
+interface CommandRunProps {
+  executable: string
+  args: CommandArgument[]
+  start: string
+  end: string
+}
+
+function CommandRun({ executable, args, start, end }: CommandRunProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [needsExpansion, setNeedsExpansion] = useState(false)
-  const commandCodeRef = useRef(null)
+  const commandCodeRef = useRef<HTMLPreElement | null>(null)
   const command = buildCommand(executable, args)
 
-  // Measure rendered overflow so the expand control appears only when required.
   useLayoutEffect(() => {
     if (isExpanded || !commandCodeRef.current) return undefined
 
@@ -164,7 +179,6 @@ function CommandRun({ executable, args, start, end }) {
               Command
             </h2>
 
-            {/* The full command stays in the document and clipboard when collapsed. */}
             <div
               className={`command-preview border rounded-3 bg-body-tertiary p-3 pe-5 flex-grow-1 ${
                 needsExpansion ? 'has-overflow' : ''
@@ -196,7 +210,6 @@ function CommandRun({ executable, args, start, end }) {
             </div>
           </div>
 
-          {/* Timing is intentionally compact; arguments remain in the command only. */}
           <div className="col-12 col-lg-4 d-flex">
             <div className="d-flex flex-column justify-content-between gap-2 w-100">
               {timingDetails.map(({ label, value }) => (
@@ -213,7 +226,6 @@ function CommandRun({ executable, args, start, end }) {
           </div>
         </div>
 
-        {/* Keep the note outside the equal-height columns to preserve alignment. */}
         <div className="row">
           <div className="col-12 col-lg-8">
             <p className="small text-secondary d-flex align-items-center gap-2 mt-2 mb-0">

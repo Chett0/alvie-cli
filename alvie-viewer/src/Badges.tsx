@@ -1,4 +1,15 @@
-function ActorBadge({ actor = 'No actor' }) {
+import type { Actor } from './types'
+
+interface ActorBadgeProps {
+  actor?: Actor
+}
+
+interface SymbolBadgeProps {
+  symbol: string
+  color?: string
+}
+
+function ActorBadge({ actor = 'No actor' }: ActorBadgeProps) {
   return (
     <span
       className={`badge rounded-2 border actor-badge actor-${actor.toLowerCase().replace(' ', '-')}`}
@@ -8,7 +19,7 @@ function ActorBadge({ actor = 'No actor' }) {
   )
 }
 
-function SymbolBadge({ symbol, color }) {
+function SymbolBadge({ symbol, color }: SymbolBadgeProps) {
   const colorClass = `${color?.replace('/', '-') ?? 'neutral'}-symbol`
 
   return (

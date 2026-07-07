@@ -6,6 +6,12 @@ Web interface for exploring and filtering parsed JSON results produced by ALVIE-
 
 <br>
 
+### Dependencies
+
+- Node 22+
+
+<br>
+
 ### Features
 
 - Import parsed ALVIE output through file selection or drag and drop

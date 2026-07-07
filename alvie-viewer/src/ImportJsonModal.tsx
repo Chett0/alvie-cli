@@ -1,17 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
+import type { ChangeEvent, DragEvent } from 'react'
 
-function ImportJsonModal({ onClose, onImport }) {
+interface ImportJsonModalProps {
+  onClose: () => void
+  onImport: (file: File) => Promise<void>
+}
+
+function ImportJsonModal({ onClose, onImport }: ImportJsonModalProps) {
   const [error, setError] = useState('')
   const [isDragging, setIsDragging] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
-  const dialogRef = useRef(null)
-  const fileInputRef = useRef(null)
+  const dialogRef = useRef<HTMLDivElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-  // Match standard modal behavior: lock background scrolling, focus the dialog,
-  // support Escape, and return focus when the modal closes.
   useEffect(() => {
     const previouslyFocusedElement = document.activeElement
-    const closeOnEscape = (event) => {
+
+    const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose()
     }
 
@@ -22,12 +27,14 @@ function ImportJsonModal({ onClose, onImport }) {
     return () => {
       document.body.classList.remove('modal-open')
       document.removeEventListener('keydown', closeOnEscape)
-      previouslyFocusedElement?.focus()
+
+      if (previouslyFocusedElement instanceof HTMLElement) {
+        previouslyFocusedElement.focus()
+      }
     }
   }, [onClose])
 
-  // Check imported file is correct, then let App parse and store it.
-  const importFile = async (file) => {
+  const importFile = async (file?: File) => {
     if (!file) return
 
     if (!file.name.toLowerCase().endsWith('.json')) {
@@ -51,18 +58,17 @@ function ImportJsonModal({ onClose, onImport }) {
     }
   }
 
-  // Reset the native input so the same file can be selected again after an error.
-  const selectFile = (event) => {
+  const selectFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
-    importFile(file)
+    void importFile(file)
   }
 
-  // Prevent the browser from opening a dropped file and import it through one path.
-  const dropFile = (event) => {
+  // Route both browsing and drag-and-drop through the same import path.
+  const dropFile = (event: DragEvent<HTMLButtonElement>) => {
     event.preventDefault()
     setIsDragging(false)
-    importFile(event.dataTransfer.files?.[0])
+    void importFile(event.dataTransfer.files?.[0])
   }
 
   return (
@@ -73,7 +79,7 @@ function ImportJsonModal({ onClose, onImport }) {
         aria-modal="true"
         aria-labelledby="import-json-title"
         ref={dialogRef}
-        tabIndex="-1"
+        tabIndex={-1}
         onMouseDown={(event) => {
           if (event.target === event.currentTarget) onClose()
         }}
@@ -94,7 +100,6 @@ function ImportJsonModal({ onClose, onImport }) {
             </div>
 
             <div className="modal-body">
-              {/* One drop zone serves both mouse users and drag-and-drop users. */}
               <button
                 type="button"
                 className={`import-drop-zone w-100 rounded-3 p-5 ${
@@ -132,7 +137,6 @@ function ImportJsonModal({ onClose, onImport }) {
                 </div>
               )}
             </div>
-
           </div>
         </div>
       </div>

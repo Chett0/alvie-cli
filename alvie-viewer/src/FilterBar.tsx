@@ -1,9 +1,24 @@
 import Filter from './Filter'
 import { ActorBadge, SymbolBadge } from './Badges'
+import type { Actor, FilterOptions, FilterValues, SelectOption } from './types'
 
-const renderActorBadge = ({ value }) => <ActorBadge actor={value} />
+interface FilterBarProps {
+  options: FilterOptions
+  values: FilterValues
+  search: string
+  searchError: string
+  onFilterChange: <K extends keyof FilterValues>(
+    filter: K,
+    values: FilterValues[K],
+  ) => void
+  onSearchChange: (value: string) => void
+}
 
-const renderSymbolBadge = ({ value, color }) => (
+const renderActorBadge = ({ value }: SelectOption) => (
+  <ActorBadge actor={value as Actor} />
+)
+
+const renderSymbolBadge = ({ value, color }: SelectOption) => (
   <SymbolBadge symbol={value} color={color} />
 )
 
@@ -14,7 +29,7 @@ function FilterBar({
   searchError,
   onFilterChange,
   onSearchChange,
-}) {
+}: FilterBarProps) {
   return (
     <div className="row g-3 my-2 mb-4">
       <div className="col-12 col-md-6 col-xl">
@@ -24,7 +39,7 @@ function FilterBar({
           options={options.actors}
           selectedValues={values.actors}
           placeholder="All actors"
-          onChange={(values) => onFilterChange('actors', values)}
+          onChange={(nextValues) => onFilterChange('actors', nextValues)}
           renderBadge={renderActorBadge}
         />
       </div>
@@ -36,7 +51,7 @@ function FilterBar({
           options={options.inputs}
           selectedValues={values.inputs}
           placeholder="All inputs"
-          onChange={(values) => onFilterChange('inputs', values)}
+          onChange={(nextValues) => onFilterChange('inputs', nextValues)}
           renderBadge={renderSymbolBadge}
         />
       </div>
@@ -48,7 +63,7 @@ function FilterBar({
           options={options.outputs}
           selectedValues={values.outputs}
           placeholder="All outputs"
-          onChange={(values) => onFilterChange('outputs', values)}
+          onChange={(nextValues) => onFilterChange('outputs', nextValues)}
           renderBadge={renderSymbolBadge}
         />
       </div>

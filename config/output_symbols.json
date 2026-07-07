@@ -104,56 +104,67 @@
     "outputs": {
         "†": {
             "name": "OIllegal",
+            "actor": "No actor",
             "description": "Input not permitted at this point; the step is ignored",
             "color": "yellow"
         },
         "?": {
             "name": "OUnsupported",
+            "actor": "No actor",
             "description": "Action is not representable",
             "color": "yellow"
         },
         "•": {
             "name": "OReset",
+            "actor": "No actor",
             "description": "The processor reset; the run is terminated and re-initialised",
             "color": "red"
         },
         "∞": {
             "name": "OMaybeDiverge",
+            "actor": "No actor",
             "description": "Simulation diverged or an infinite loop was detected",
             "color": "red"
         },
         "i": {
             "name": "OJmpIn",
+            "actor": "Attacker",
             "description": "The processor entered the enclave",
             "color": "blue"
         },
         "s": {
             "name": "OSilent",
+            "actor": "Attacker",
             "description": "Action completed silently",
             "color": "blue"
         },
         "t": {
             "name": "OTime",
+            "actor": "Enclave",
             "description": "Timed observation",
             "color": "green"
         },
         "o": {
             "name": "OJmpOut",
+            "actor": "Enclave",
             "description": "The enclave exited normally",
             "color": "green"
         },
         "r": {
             "name": "OReti",
+            "actor": "Attacker",
             "description": "The processor returned from interrupt routine",
             "color": "magenta"
         },
         "th": {
             "name": "OTime_Handle",
+            "actor": "Attacker",
             "description": "Timed observation followed by an interrupt being handled",
             "color": "magenta"
         },
         "oh": {
             "name": "OJmpOut_Handle",
+            "actor": "Attacker",
             "description": "Enclave exit followed by an interrupt being handled",
             "color": "magenta"
         }

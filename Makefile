@@ -21,6 +21,9 @@ run:
 	docker compose up -d $(VIEWER_SERVICE)
 	docker compose run --rm -it $(SERVICE)
 
+cli:
+	docker compose run --rm -it $(SERVICE)
+
 viewer:
 	docker compose up -d $(VIEWER_SERVICE)
 
