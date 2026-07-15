@@ -20,6 +20,26 @@ const matchesFilter = (selectedValues: string[], availableValues: string[]) =>
   selectedValues.length === 0 ||
   selectedValues.some((value) => availableValues.includes(value))
 
+const stepMatchesFilters = (
+  { inputs = [], outputs = [] }: Run[number],
+  filters: FilterValues,
+) => {
+  const stepInputSymbols = inputs.map(({ symbol }) => symbol)
+  const stepActors = [
+    ...inputs.map(({ actor }) => actor),
+    ...outputs.map((symbol) => symbolCatalog.outputs[symbol]?.actor),
+  ].filter(Boolean)
+
+  return (
+    matchesFilter(filters.actors, stepActors) &&
+    matchesFilter(filters.inputs, stepInputSymbols) &&
+    matchesFilter(filters.outputs, outputs)
+  )
+}
+
+const runMatchesFilters = (run: IndexedRun, filters: FilterValues) =>
+  run.steps.some((step) => stepMatchesFilters(step, filters))
+
 const indexRun = (
   steps: Run,
   hypothesisIndex: number,
@@ -53,6 +73,9 @@ const indexRun = (
     ...inputs.map((symbol) => symbolCatalog.inputs[symbol]),
     ...outputs.map((symbol) => symbolCatalog.outputs[symbol]),
   ]
+  const detailText = details
+    .filter(Boolean)
+    .flatMap((detail) => [detail.name, detail.description])
 
   return {
     steps,
@@ -60,10 +83,15 @@ const indexRun = (
     actors,
     inputSymbols: inputs,
     outputSymbols: outputs,
+
+    // Example: "hypothesis 1 run 1 attacker enclave no actor sc u t † cstartcounting start the timer counter cubr unconditional branch exits enclave otime timed observation oillegal input not permitted"
     searchText: [
       `hypothesis ${hypothesisIndex + 1}`,
       `run ${runIndex + 1}`,
-      JSON.stringify({ steps, details }),
+      ...actors,
+      ...inputs,
+      ...outputs,
+      ...detailText,
     ].join(' ').toLowerCase(),
   }
 }
@@ -88,14 +116,18 @@ export const filterHypotheses = (
   if (!searchRegex && !hasActiveFilters) return hypotheses
 
   return hypotheses.flatMap(({ index, runs }) => {
+
+    // filter runs based on search and filters
     const matchingRuns = runs.filter(
       (run) =>
+        // search filter
         (!searchRegex || searchRegex.test(run.searchText)) &&
-        matchesFilter(filters.actors, run.actors) &&
-        matchesFilter(filters.inputs, run.inputSymbols) &&
-        matchesFilter(filters.outputs, run.outputSymbols),
+
+        // Dropdown filters must match the same step; the full matching run is still shown.
+        (!hasActiveFilters || runMatchesFilters(run, filters)),
     )
 
+    // [ [{index: 0, runs: [run1, run2]}], [{index: 1, runs: [run3]}], [] ] -- flatten --> [ {index: 0, runs: [run1, run2]}, {index: 1, runs: [run3]} ]
     return matchingRuns.length ? [{ index, runs: matchingRuns }] : []
   })
 }

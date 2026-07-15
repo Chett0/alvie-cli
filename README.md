@@ -58,7 +58,30 @@ Ensure you have the following installed on your system:
 
 ```bash
 git clone https://github.com/Chett0/alvie-cli
-make
+```
+
+```bash
+make run # start viewer in background and CLI in foreground
+
+make cli # start CLI only
+
+make viewer # start viewer only
+```
+
+```bash
+make stop # stop viewer and CLI
+
+make stop-cli # stop CLI only
+
+make stop-viewer # stop viewer only
+```
+
+```bash
+make restart # restart viewer and CLI
+
+make restart-cli # restart CLI only
+
+make restart-viewer # restart viewer only
 ```
 
 This will build both the ALVIE-CLI and ALVIE-VIEWER images, available at `localhost:4242`

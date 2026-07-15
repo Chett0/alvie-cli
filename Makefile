@@ -1,55 +1,60 @@
 BASE_IMAGE := matteobusi/alvie
-SERVICE := app
-VIEWER_SERVICE := viewer
+PROJECT_NAME = alvie
+
+SERVICE := app # CLI
+VIEWER_SERVICE := viewer # viewer
+
+COMPOSE_CMD := docker compose -p $(PROJECT_NAME)
+
 VENV_ACTIVATE := /home/alvie/venv/bin/activate
 
-.PHONY: all pull build rebuild run compose compose-up compose-exec compose-stop compose-start compose-start-container compose-restart compose-restart-container
+.PHONY: all pull build rebuild run cli viewer up stop stop-cli stop-viewer down restart restart-cli restart-viewer exec
 
-all: build run
+all: run
 
 pull:
 	docker pull $(BASE_IMAGE)
 
 build:
-	docker compose build
+	$(COMPOSE_CMD) build
 
 rebuild:
-	docker compose build --no-cache
+	$(COMPOSE_CMD) build --no-cache
 
 # start viewer in background and run alvie-cli in foreground
 run:
-	docker compose up -d $(VIEWER_SERVICE)
-	docker compose run --rm -it $(SERVICE)
+	$(COMPOSE_CMD) up --build -d $(VIEWER_SERVICE)
+	$(COMPOSE_CMD) run --rm -it $(SERVICE)
 
 cli:
-	docker compose run --rm -it $(SERVICE)
+	$(COMPOSE_CMD) run --build --rm -it $(SERVICE)
 
 viewer:
-	docker compose up -d $(VIEWER_SERVICE)
+	$(COMPOSE_CMD) up --build -d $(VIEWER_SERVICE)
 
-compose: 
-	docker compose up -d
-	docker compose exec -it $(SERVICE) /bin/bash --rcfile $(VENV_ACTIVATE)
-
-compose-up:
-	docker compose up -d $(SERVICE)
+up:
+	$(COMPOSE_CMD) up --build -d
 
 stop:
-	docker compose stop $(SERVICE)
-	docker compose stop $(VIEWER_SERVICE)
+	$(COMPOSE_CMD) stop
 
+stop-cli:
+	$(COMPOSE_CMD) stop $(SERVICE)
 
-start: compose-start exec
+stop-viewer:
+	$(COMPOSE_CMD) stop $(VIEWER_SERVICE)
 
-compose-start:
-	docker compose start $(SERVICE)
+down:
+	$(COMPOSE_CMD) down
 
+restart:
+	$(COMPOSE_CMD) restart
 
-restart: compose-restart exec
+restart-cli:
+	$(COMPOSE_CMD) restart $(SERVICE)
 
-compose-restart:
-	docker compose restart $(SERVICE)
-	docker compose restart $(VIEWER_SERVICE)
+restart-viewer:
+	$(COMPOSE_CMD) restart $(VIEWER_SERVICE)
 
 exec:
-	docker compose exec -it $(SERVICE) /bin/bash --rcfile $(VENV_ACTIVATE)
+	$(COMPOSE_CMD) exec -it $(SERVICE) /bin/bash --rcfile $(VENV_ACTIVATE)

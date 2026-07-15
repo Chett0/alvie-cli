@@ -49,4 +49,4 @@ function HypothesisCard({
   )
 }
 
-export default HypothesisCard
+export default HypothesisCard;

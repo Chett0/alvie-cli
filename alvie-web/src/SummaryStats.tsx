@@ -27,4 +27,4 @@ function SummaryStats({ recap }: { recap: Recap }) {
   )
 }
 
-export default SummaryStats
+export default SummaryStats;

@@ -42,15 +42,43 @@ const readActor = (value: unknown, path: string): Actor => {
   return value as Actor
 }
 
-const readStep = (value: unknown, path: string): RunStep => {
-  if (!isRecord(value)) failValidation({ path, expected: 'an object' })
+const formatStepLocation = (
+  hypothesisIndex: number,
+  runIndex: number,
+  stepIndex: number,
+  detail?: string,
+) =>
+  [
+    `hypothesis ${hypothesisIndex + 1}`,
+    `run ${runIndex + 1}`,
+    `step ${stepIndex + 1}`,
+    detail,
+  ]
+    .filter(Boolean)
+    .join(', ')
+
+const readStep = (
+  value: unknown,
+  hypothesisIndex: number,
+  runIndex: number,
+  stepIndex: number,
+): RunStep => {
+  const stepPath = formatStepLocation(hypothesisIndex, runIndex, stepIndex)
+
+  if (!isRecord(value)) failValidation({ path: stepPath, expected: 'an object' })
   const record = value as Record<string, unknown>
 
   if (!Array.isArray(record.inputs)) {
-    failValidation({ path: `${path}.inputs`, expected: 'an array' })
+    failValidation({
+      path: formatStepLocation(hypothesisIndex, runIndex, stepIndex, 'inputs'),
+      expected: 'an array',
+    })
   }
   if (!Array.isArray(record.outputs)) {
-    failValidation({ path: `${path}.outputs`, expected: 'an array' })
+    failValidation({
+      path: formatStepLocation(hypothesisIndex, runIndex, stepIndex, 'outputs'),
+      expected: 'an array',
+    })
   }
 
   const inputs = record.inputs as unknown[]
@@ -58,23 +86,36 @@ const readStep = (value: unknown, path: string): RunStep => {
 
   return {
     inputs: inputs.map((input: unknown, inputIndex: number) => {
-      const inputPath = `${path}.inputs[${inputIndex}]`
+      const inputPath = formatStepLocation(
+        hypothesisIndex,
+        runIndex,
+        stepIndex,
+        `input ${inputIndex + 1}`,
+      )
 
       if (!isRecord(input)) failValidation({ path: inputPath, expected: 'an object' })
       const inputRecord = input as Record<string, unknown>
 
       return {
-        symbol: readString(inputRecord.symbol, `${inputPath}.symbol`),
-        actor: readActor(inputRecord.actor, `${inputPath}.actor`),
+        symbol: readString(inputRecord.symbol, `${inputPath}, symbol`),
+        actor: readActor(inputRecord.actor, `${inputPath}, actor`),
       }
     }),
     outputs: outputs.map((output: unknown, outputIndex: number) =>
-      readString(output, `${path}.outputs[${outputIndex}]`),
+      readString(
+        output,
+        formatStepLocation(
+          hypothesisIndex,
+          runIndex,
+          stepIndex,
+          `output ${outputIndex + 1}`,
+        ),
+      ),
     ),
   }
 }
 
-export const parseParsedOutput = (value: unknown): ParsedOutput => {
+export const validateParsedOutput = (value: unknown): ParsedOutput => {
   if (!isRecord(value)) failValidation({ path: 'root', expected: 'an object' })
   const record = value as Record<string, unknown>
 
@@ -94,7 +135,7 @@ export const parseParsedOutput = (value: unknown): ParsedOutput => {
     recap[key] = readNumber(value, `recap.${key}`) // ensure recap values are numbers
   }
 
-  // Summary fields shown on the UI
+  // summary fields
   readNumber(recap.hypotheses, 'recap.hypotheses')
   readNumber(recap.runs, 'recap.runs')
   readNumber(recap.steps, 'recap.steps')
@@ -110,7 +151,7 @@ export const parseParsedOutput = (value: unknown): ParsedOutput => {
     hypotheses: hypotheses.map((hypothesis: unknown, hypothesisIndex: number) => {
       if (!Array.isArray(hypothesis)) {
         failValidation({
-          path: `hypotheses[${hypothesisIndex}]`,
+          path: `hypothesis ${hypothesisIndex + 1}`,
           expected: 'an array of runs',
         })
       }
@@ -120,7 +161,7 @@ export const parseParsedOutput = (value: unknown): ParsedOutput => {
       return runs.map((run: unknown, runIndex: number) => {
         if (!Array.isArray(run)) {
           failValidation({
-            path: `hypotheses[${hypothesisIndex}][${runIndex}]`,
+            path: `hypothesis ${hypothesisIndex + 1}, run ${runIndex + 1}`,
             expected: 'an array of steps',
           })
         }
@@ -128,7 +169,7 @@ export const parseParsedOutput = (value: unknown): ParsedOutput => {
         const steps = run as unknown[]
 
         return steps.map((step: unknown, stepIndex: number) =>
-          readStep(step, `hypotheses[${hypothesisIndex}][${runIndex}][${stepIndex}]`),
+          readStep(step, hypothesisIndex, runIndex, stepIndex),
         )
       })
     }),

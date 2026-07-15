@@ -68,7 +68,7 @@ function ImportJsonModal({ onClose, onImport }: ImportJsonModalProps) {
   const dropFile = (event: DragEvent<HTMLButtonElement>) => {
     event.preventDefault()
     setIsDragging(false)
-    void importFile(event.dataTransfer.files?.[0])
+    void importFile(event.dataTransfer.files?.[0]) // take first dropped file
   }
 
   return (

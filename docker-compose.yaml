@@ -17,9 +17,9 @@ services:
   viewer:
     build:
       context: .
-      dockerfile: alvie-viewer/Dockerfile
+      dockerfile: alvie-web/Dockerfile
 
-    hostname: alvie-viewer
+    hostname: alvie-web
 
     ports:
       - "127.0.0.1:4242:80"

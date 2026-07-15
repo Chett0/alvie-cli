@@ -8,7 +8,7 @@ import Header from './Header'
 import Hypotheses from './Hypotheses'
 import ImportJsonModal from './ImportJsonModal'
 import symbolCatalog from './symbolCatalog'
-import { parseParsedOutput } from './validation'
+import { validateParsedOutput } from './validation'
 import type { FilterOptions, FilterValues, ParsedOutput } from './types'
 
 const EMPTY_HYPOTHESES: ParsedOutput['hypotheses'] = []
@@ -36,7 +36,7 @@ function App() {
   const [page, setPage] = useState(1)
   const hypotheses = parsedOutput?.hypotheses ?? EMPTY_HYPOTHESES
 
-  // Keep typing responsive while expensive filtering catches up.
+  // show current results, while searching 
   const deferredSearch = useDeferredValue(search.trim())
 
   const { searchRegex, searchError } = useMemo(() => {
@@ -59,16 +59,16 @@ function App() {
   }, [deferredSearch])
 
   const onFilterChange = <K extends keyof FilterValues>(
-    filter: K,
-    values: FilterValues[K],
+    filter: K,                // filter name
+    values: FilterValues[K],  // type of filter values (array of strings)
   ) => {
     setFilters((current) => ({ ...current, [filter]: values }))
     setPage(1)
   }
 
-  // Parse first, then validate the imported data before replacing the UI state.
+  // Parse first, then validate the imported data
   const importJson = async (file: File) => {
-    const data = parseParsedOutput(JSON.parse(await file.text()))
+    const data = validateParsedOutput(JSON.parse(await file.text()))
 
     setParsedOutput(data)
     setSearch('')
@@ -109,7 +109,7 @@ function App() {
       <section className="container-fluid my-3">
         {!parsedOutput ? (
           <div className="bg-white border rounded-3 text-center text-secondary py-5 px-3">
-            Import a parsed output JSON file to view its hypotheses.
+            Import a parsed output JSON file to analyze its hypotheses.
           </div>
         ) : (
           <>
@@ -148,4 +148,4 @@ function App() {
   )
 }
 
-export default App
+export default App;

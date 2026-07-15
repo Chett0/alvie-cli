@@ -111,4 +111,4 @@ function FilterBar({
   )
 }
 
-export default FilterBar
+export default FilterBar;

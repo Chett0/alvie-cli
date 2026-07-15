@@ -5,6 +5,7 @@ import type { CommandArgument } from './types'
 const RUN_DIRECTORY = '/home/alvie/alvie/code'
 const BIN_DIRECTORY = `${RUN_DIRECTORY}/_build/default/bin`
 
+// encode special chars for bash
 const quoteArgument = (value: string) =>
   /^[\w./:=+@%-]+$/.test(value)
     ? value
@@ -245,4 +246,4 @@ function CommandRun({ executable, args, start, end }: CommandRunProps) {
   )
 }
 
-export default CommandRun
+export default CommandRun;

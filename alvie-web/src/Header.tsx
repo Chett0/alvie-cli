@@ -2,18 +2,18 @@ interface HeaderProps {
   onImportClick: () => void
 }
 
-// Keep the header presentational so App stays in control of the workflow.
 function Header({ onImportClick }: HeaderProps) {
   return (
     <header className="container-fluid">
       <div className="d-flex justify-content-between align-items-center p-3">
-        <h4 className="mb-0">ALVIE-CLI VIEWER</h4>
+        <h4 className="mb-0">AlvieWeb</h4>
 
         <button
           className="btn btn-primary d-inline-flex align-items-center gap-2"
           type="button"
           onClick={onImportClick}
         >
+          {/* Import ICON */}
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="20"

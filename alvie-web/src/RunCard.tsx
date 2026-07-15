@@ -36,4 +36,4 @@ function RunCard({ index, defaultOpen = false, children }: RunCardProps) {
   )
 }
 
-export default RunCard
+export default RunCard;

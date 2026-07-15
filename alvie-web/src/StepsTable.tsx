@@ -123,4 +123,4 @@ function StepsTable({ steps }: { steps: RunStep[] }) {
   )
 }
 
-export default StepsTable
+export default StepsTable;
