@@ -14,7 +14,8 @@ Web interface for exploring and filtering parsed JSON results produced by ALVIE-
 
 ### Features
 
-- Import parsed ALVIE output through file selection or drag and drop
+- Import parsed ALVIE output through file selection, drag and drop, or URL
+- Reload and share the current file through the `?file=` query parameter
 - View execution recap: command run, executable, arguments, start/end timestamps
 - Browse hypotheses, runs, steps
 - Filter results by actor, input and output symbols
@@ -31,7 +32,15 @@ python alvie-cli presets/config.json \
   --parsed-output parsed-output/result.json
 ```
 
-Then open: `http://localhost:4242` and import the `parsed-output/result.json` file.
+Then open `http://localhost:4242` and import `parsed-output/result.json`. The
+viewer updates the address to:
+
+```text
+http://localhost:4242/?file=/parsed-output/result.json
+```
+
+Files inside the root `parsed-output` directory are served read-only. You can
+also open an address in this format directly; the viewer loads, parses, and validates the referenced file automatically.
 
 <br>
 

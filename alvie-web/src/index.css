@@ -186,12 +186,29 @@ header{
   vertical-align: middle;
 }
 
-.steps-table th:first-child {
+.steps-table {
+  min-width: 52rem;
+}
+
+/* The columns before and after the arrow occupy the same overall width. */
+.step-number-column {
   width: 4rem;
 }
 
-.steps-table th:nth-child(4) {
-  width: 4rem;
+.input-actor-column {
+  width: 9rem;
+}
+
+.input-action-column {
+  width: calc(50% - 15.5rem);
+}
+
+.transition-column {
+  width: 5rem;
+}
+
+.output-action-column {
+  width: calc(50% - 2.5rem);
 }
 
 .step-stack {

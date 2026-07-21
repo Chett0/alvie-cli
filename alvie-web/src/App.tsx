@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import './App.css'
 import { filterHypotheses, indexHypotheses, symbolsToOptions } from './util'
 import CommandRun from './CommandRun'
@@ -8,7 +8,12 @@ import Header from './Header'
 import Hypotheses from './Hypotheses'
 import ImportJsonModal from './ImportJsonModal'
 import symbolCatalog from './symbolCatalog'
-import { validateParsedOutput } from './validation'
+import {
+  getParsedOutputUrl,
+  loadParsedOutput,
+  parseParsedOutput,
+  setParsedOutputUrl,
+} from './parsedOutputLoader'
 import type { FilterOptions, FilterValues, ParsedOutput } from './types'
 
 const EMPTY_HYPOTHESES: ParsedOutput['hypotheses'] = []
@@ -34,7 +39,34 @@ function App() {
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState<FilterValues>(EMPTY_FILTERS)
   const [page, setPage] = useState(1)
+  const [loadError, setLoadError] = useState('')
   const hypotheses = parsedOutput?.hypotheses ?? EMPTY_HYPOTHESES
+
+  const showParsedOutput = (data: ParsedOutput) => {
+    setParsedOutput(data)
+    setSearch('')
+    setFilters(EMPTY_FILTERS)
+    setPage(1)
+    setLoadError('')
+  }
+
+  useEffect(() => {
+    const fileUrl = getParsedOutputUrl()
+    if (!fileUrl) return
+
+    const controller = new AbortController()
+
+    void loadParsedOutput(fileUrl, controller.signal)
+      .then(showParsedOutput)
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        setLoadError(
+          error instanceof Error ? error.message : 'Unable to load the JSON file.',
+        )
+      })
+
+    return () => controller.abort()
+  }, [])
 
   // show current results, while searching 
   const deferredSearch = useDeferredValue(search.trim())
@@ -66,14 +98,11 @@ function App() {
     setPage(1)
   }
 
-  // Parse first, then validate the imported data
+  // A manually selected file is expected to live in the shared parsed-output directory.
   const importJson = async (file: File) => {
-    const data = validateParsedOutput(JSON.parse(await file.text()))
-
-    setParsedOutput(data)
-    setSearch('')
-    setFilters(EMPTY_FILTERS)
-    setPage(1)
+    const data = parseParsedOutput(await file.text())
+    showParsedOutput(data)
+    setParsedOutputUrl(file.name)
   }
 
   const indexedHypotheses = useMemo(
@@ -108,8 +137,14 @@ function App() {
 
       <section className="container-fluid my-3">
         {!parsedOutput ? (
-          <div className="bg-white border rounded-3 text-center text-secondary py-5 px-3">
-            Import a parsed output JSON file to analyze its hypotheses.
+          <div className="bg-white border rounded-3 text-center py-5 px-3">
+            {loadError ? (
+              <div className="text-danger">{loadError}</div>
+            ) : (
+              <div className="text-secondary">
+                Import a parsed output JSON file to analyze its hypotheses.
+              </div>
+            )}
           </div>
         ) : (
           <>

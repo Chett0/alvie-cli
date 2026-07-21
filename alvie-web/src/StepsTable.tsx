@@ -32,6 +32,15 @@ function StepsTable({ steps }: { steps: RunStep[] }) {
       <table className="table steps-table align-middle mb-0">
         <caption className="visually-hidden">Run steps</caption>
 
+        {/* Keep the transition arrow centered between the input and output areas. */}
+        <colgroup>
+          <col className="step-number-column" />
+          <col className="input-actor-column" />
+          <col className="input-action-column" />
+          <col className="transition-column" />
+          <col className="output-action-column" />
+        </colgroup>
+
         <thead className="table-light">
           <tr>
             <th scope="col">#</th>
@@ -41,7 +50,6 @@ function StepsTable({ steps }: { steps: RunStep[] }) {
               <span className="visually-hidden">Produces</span>
               <span aria-hidden="true">→</span>
             </th>
-            <th scope="col">Output actor</th>
             <th scope="col">Output action</th>
           </tr>
         </thead>
@@ -101,10 +109,6 @@ function StepsTable({ steps }: { steps: RunStep[] }) {
                       </td>
                     </>
                   )}
-
-                  <td>
-                    <ActorBadge actor={outputDetails?.actor} />
-                  </td>
 
                   <td>
                     {symbol ? (

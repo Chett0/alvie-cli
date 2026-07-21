@@ -23,3 +23,7 @@ services:
 
     ports:
       - "127.0.0.1:4242:80"
+
+    # Make generated JSON files available to ?file=/parsed-output/<file>.json.
+    volumes:
+      - ./parsed-output:/usr/share/nginx/html/parsed-output:ro

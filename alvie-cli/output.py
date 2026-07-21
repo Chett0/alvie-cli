@@ -865,7 +865,7 @@ class AlvieExecution:
             cwd=self.alvie_path,
             stdout=subprocess.PIPE,
             stderr=None,
-            text=True,
+            text=True
         )
 
         if not process:
