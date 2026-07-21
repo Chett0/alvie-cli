@@ -7,12 +7,15 @@ import FilterBar from './FilterBar'
 import Header from './Header'
 import Hypotheses from './Hypotheses'
 import ImportJsonModal from './ImportJsonModal'
+import SavedOutputsModal from './SavedOutputsModal'
+import { fetchStoredOutput } from './api'
 import symbolCatalog from './symbolCatalog'
 import {
   getParsedOutputUrl,
   loadParsedOutput,
   parseParsedOutput,
   setParsedOutputUrl,
+  setStoredOutputUrl,
 } from './parsedOutputLoader'
 import type { FilterOptions, FilterValues, ParsedOutput } from './types'
 
@@ -36,6 +39,7 @@ const FILTER_OPTIONS: FilterOptions = {
 function App() {
   const [parsedOutput, setParsedOutput] = useState<ParsedOutput | null>(null)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [isSavedModalOpen, setIsSavedModalOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState<FilterValues>(EMPTY_FILTERS)
   const [page, setPage] = useState(1)
@@ -105,6 +109,21 @@ function App() {
     setParsedOutputUrl(file.name)
   }
 
+  // Load a stored configuration from the backend and show it in the viewer.
+  const viewStoredOutput = async (id: number) => {
+    try {
+      const data = await fetchStoredOutput(id)
+      showParsedOutput(data)
+      setStoredOutputUrl(id)
+      setIsSavedModalOpen(false)
+    } catch (error) {
+      setLoadError(
+        error instanceof Error ? error.message : 'Unable to load the configuration.',
+      )
+      setIsSavedModalOpen(false)
+    }
+  }
+
   const indexedHypotheses = useMemo(
     () => indexHypotheses(hypotheses),
     [hypotheses],
@@ -126,12 +145,22 @@ function App() {
 
   return (
     <>
-      <Header onImportClick={() => setIsImportModalOpen(true)} />
+      <Header
+        onImportClick={() => setIsImportModalOpen(true)}
+        onSavedClick={() => setIsSavedModalOpen(true)}
+      />
 
       {isImportModalOpen && (
         <ImportJsonModal
           onClose={() => setIsImportModalOpen(false)}
           onImport={importJson}
+        />
+      )}
+
+      {isSavedModalOpen && (
+        <SavedOutputsModal
+          onClose={() => setIsSavedModalOpen(false)}
+          onView={(id) => void viewStoredOutput(id)}
         />
       )}
 

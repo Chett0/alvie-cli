@@ -1,4 +1,5 @@
 import argparse
+from datetime import datetime
 from email import errors
 from io import TextIOWrapper
 import uuid
@@ -25,8 +26,9 @@ from output import (
     DEBUG_REQUIRES_RAW_OUTPUT_ERROR,
     merge_tmp_file,
     remove_tmp_files,
-    print_banner
+    print_banner,
 )
+
 from utils import (
     get_alvie_code_path,
     json_output_path,
@@ -179,6 +181,12 @@ def run_non_interactive(argv: list[str]) -> None:
         default=1,
         help="Number of configurations to run in parallel (default: 1)",
     )
+    parser.add_argument(
+        "-i", "--interactive",
+        action="store_true",
+        help="After running, upload each parsed output to the backend "
+             "and print a link to open it in the Alvie viewer",
+    )
 
     namespace = parser.parse_args(argv)
 
@@ -230,13 +238,16 @@ def run_non_interactive(argv: list[str]) -> None:
     if namespace.njobs == 1 or len(executions) == 1:
         for execution in executions:
             execution.run_seq()
-            
     else:
         run_parallel(
             output_path=namespace.output,
             executions=executions,
             njobs=namespace.njobs
         )
+
+    if namespace.interactive:
+        for execution in executions:
+            execution.upload_execution()
 
 
 def run_interactive() -> None:

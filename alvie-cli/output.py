@@ -15,6 +15,7 @@ from typing import IO
 
 from utils import load_output_symbols
 from flows import ConfigArg, is_debug_enabled
+from requests import Viewer
 
 RESET = "\033[0m"
 BOLD = "\033[1m"
@@ -570,6 +571,8 @@ class AlvieExecution:
     parsed_output_path: Path | None = field(default=None)
     parallel: bool = field(default=False)
 
+    parsed_document: dict | None = field(default=None, init=False, repr=False)
+
     _process: subprocess.Popen | None = field(default=None, init=False, repr=False)
     _spinner: Spinner | None = field(default=None, init=False, repr=False)
     _output_file: TextIOWrapper | None = field(default=None, init=False, repr=False)
@@ -697,6 +700,8 @@ class AlvieExecution:
         output.hypotheses_count = len(output.parsed_hypotheses)
         if not self.parallel:
             self._write(output.format_recap(parser=parser), flush=True)
+
+        self._build_output_json(output=output)
         self._save_parsed_output(output=output)
 
 
@@ -792,13 +797,10 @@ class AlvieExecution:
         """Save parsed output as JSON when an output path is provided."""
         if not self.parsed_output_path:
             return
-
-        output_data = self._build_output_json(output=output)
-
         try:
             self.parsed_output_path.parent.mkdir(parents=True, exist_ok=True)
             with self.parsed_output_path.open("w", encoding="utf-8") as file:
-                json.dump(output_data, file, ensure_ascii=False, indent=2)
+                json.dump(self.parsed_document, file, ensure_ascii=False, indent=2)
             if not self.parallel:
                 print()
                 info(f"Parsed output saved to {_style(str(self.parsed_output_path), CYAN, BOLD)}\n")
@@ -833,9 +835,9 @@ class AlvieExecution:
     def _build_output_json(
         self,
         output: ParsedOutput,
-    ) -> dict:
+    ) -> None:
         """Build the JSON-serializable parsed output document."""
-        return {
+        self.parsed_document = {
             "executable": self.executable,
             "args": [
                 {"flag": arg.flag, "value": arg.value}
@@ -856,6 +858,37 @@ class AlvieExecution:
             },
             "hypotheses": [hypothesis.to_dict() for hypothesis in output.parsed_hypotheses],
         }
+    
+
+    def _upload_filename(self) -> str:
+        """Choose a filename to store the uploaded parsed output under."""
+        if self.parsed_output_path:
+            return self.parsed_output_path.name
+
+        start_time = self._start_time or datetime.now()
+        return f"{self.executable}-{start_time.isoformat().replace(':', '-')}.json"
+    
+    
+    def upload_execution(self) -> None:
+        """Upload each execution's parsed output to the viewer backend and print
+        a link to open it. Failures are reported but never abort the others."""
+        if not self.parsed_document:
+            warn(f"No parsed output to upload for {self.executable}.")
+        else:
+            try:
+                self._spinner = Spinner("Uploading parsed output to the Alvie viewer backend").start()
+                output_id = Viewer().post_parsed_output(
+                    document=self.parsed_document,
+                    filename=self._upload_filename(),
+                )
+                self._stop_spinner()
+                success(f"Saved parsed output for {self.executable}.")
+                info(f"\tOpen in the viewer: {Viewer().get_link(output_id)}")
+            except RuntimeError as exc:
+                self._stop_spinner()
+                error(f"{exc}\n")
+        
+        print()
 
 
     def _get_alvie_process(self) -> tuple[subprocess.Popen, IO[str]]:
