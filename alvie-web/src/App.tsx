@@ -8,6 +8,7 @@ import Header from './Header'
 import Hypotheses from './Hypotheses'
 import ImportJsonModal from './ImportJsonModal'
 import SavedOutputsModal from './SavedOutputsModal'
+import Spinner from './Spinner'
 import { fetchStoredOutput } from './api'
 import symbolCatalog from './symbolCatalog'
 import {
@@ -44,6 +45,7 @@ function App() {
   const [filters, setFilters] = useState<FilterValues>(EMPTY_FILTERS)
   const [page, setPage] = useState(1)
   const [loadError, setLoadError] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
   const hypotheses = parsedOutput?.hypotheses ?? EMPTY_HYPOTHESES
 
   const showParsedOutput = (data: ParsedOutput) => {
@@ -60,6 +62,7 @@ function App() {
 
     const controller = new AbortController()
 
+    setIsLoading(true)
     void loadParsedOutput(fileUrl, controller.signal)
       .then(showParsedOutput)
       .catch((error: unknown) => {
@@ -67,6 +70,9 @@ function App() {
         setLoadError(
           error instanceof Error ? error.message : 'Unable to load the JSON file.',
         )
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false)
       })
 
     return () => controller.abort()
@@ -111,16 +117,18 @@ function App() {
 
   // Load a stored configuration from the backend and show it in the viewer.
   const viewStoredOutput = async (id: number) => {
+    setIsSavedModalOpen(false)
+    setIsLoading(true)
     try {
       const data = await fetchStoredOutput(id)
       showParsedOutput(data)
       setStoredOutputUrl(id)
-      setIsSavedModalOpen(false)
     } catch (error) {
       setLoadError(
         error instanceof Error ? error.message : 'Unable to load the configuration.',
       )
-      setIsSavedModalOpen(false)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -165,7 +173,12 @@ function App() {
       )}
 
       <section className="container-fluid my-3">
-        {!parsedOutput ? (
+        {isLoading ? (
+          <div className="bg-white border rounded-3 d-flex flex-column align-items-center text-secondary py-5 px-3 gap-3">
+            <Spinner label="Loading parsed output…" />
+            <span>Loading parsed output…</span>
+          </div>
+        ) : !parsedOutput ? (
           <div className="bg-white border rounded-3 text-center py-5 px-3">
             {loadError ? (
               <div className="text-danger">{loadError}</div>
