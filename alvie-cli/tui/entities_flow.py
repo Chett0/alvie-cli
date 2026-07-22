@@ -9,9 +9,30 @@ import os
 from pathlib import Path
 from typing import Sequence
 
-from validators import FileExtensionValidator, ParameterValidator, ChoiceValidator
-from instructions import AttackerSection, Combinator, Entity, Instruction, BaseChoice
-from utils import BACK_CHOICE, DONE_CHOICE, HELP_CHOICE, SHOW_CHOICE, is_back, is_done, is_help, is_show, load_combinators, load_instructions, validate_save_path
+from tui.validators import (
+    FileExtensionValidator, 
+    ParameterValidator, 
+    ChoiceValidator
+)
+from models.instructions import (
+    AttackerSection, 
+    Combinator, 
+    Entity, 
+    Instruction, 
+    BaseChoice
+)
+from config.paths import validate_save_path
+from tui.choices import (
+    BACK_CHOICE, 
+    DONE_CHOICE, 
+    HELP_CHOICE, 
+    SHOW_CHOICE, 
+    is_back, 
+    is_done, 
+    is_help, 
+    is_show
+)
+from config.loaders import load_combinators, load_instructions
 
 def print_entity(
         entity: str, 

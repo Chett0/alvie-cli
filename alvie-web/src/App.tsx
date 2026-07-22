@@ -7,12 +7,16 @@ import FilterBar from './FilterBar'
 import Header from './Header'
 import Hypotheses from './Hypotheses'
 import ImportJsonModal from './ImportJsonModal'
+import SavedOutputsModal from './SavedOutputsModal'
+import Spinner from './Spinner'
+import { fetchStoredOutput } from './api'
 import symbolCatalog from './symbolCatalog'
 import {
   getParsedOutputUrl,
   loadParsedOutput,
   parseParsedOutput,
   setParsedOutputUrl,
+  setStoredOutputUrl,
 } from './parsedOutputLoader'
 import type { FilterOptions, FilterValues, ParsedOutput } from './types'
 
@@ -36,10 +40,12 @@ const FILTER_OPTIONS: FilterOptions = {
 function App() {
   const [parsedOutput, setParsedOutput] = useState<ParsedOutput | null>(null)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [isSavedModalOpen, setIsSavedModalOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState<FilterValues>(EMPTY_FILTERS)
   const [page, setPage] = useState(1)
   const [loadError, setLoadError] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
   const hypotheses = parsedOutput?.hypotheses ?? EMPTY_HYPOTHESES
 
   const showParsedOutput = (data: ParsedOutput) => {
@@ -56,6 +62,7 @@ function App() {
 
     const controller = new AbortController()
 
+    setIsLoading(true)
     void loadParsedOutput(fileUrl, controller.signal)
       .then(showParsedOutput)
       .catch((error: unknown) => {
@@ -63,6 +70,9 @@ function App() {
         setLoadError(
           error instanceof Error ? error.message : 'Unable to load the JSON file.',
         )
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false)
       })
 
     return () => controller.abort()
@@ -105,6 +115,23 @@ function App() {
     setParsedOutputUrl(file.name)
   }
 
+  // Load a stored configuration from the backend and show it in the viewer.
+  const viewStoredOutput = async (id: number) => {
+    setIsSavedModalOpen(false)
+    setIsLoading(true)
+    try {
+      const data = await fetchStoredOutput(id)
+      showParsedOutput(data)
+      setStoredOutputUrl(id)
+    } catch (error) {
+      setLoadError(
+        error instanceof Error ? error.message : 'Unable to load the configuration.',
+      )
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const indexedHypotheses = useMemo(
     () => indexHypotheses(hypotheses),
     [hypotheses],
@@ -126,7 +153,10 @@ function App() {
 
   return (
     <>
-      <Header onImportClick={() => setIsImportModalOpen(true)} />
+      <Header
+        onImportClick={() => setIsImportModalOpen(true)}
+        onSavedClick={() => setIsSavedModalOpen(true)}
+      />
 
       {isImportModalOpen && (
         <ImportJsonModal
@@ -135,8 +165,20 @@ function App() {
         />
       )}
 
+      {isSavedModalOpen && (
+        <SavedOutputsModal
+          onClose={() => setIsSavedModalOpen(false)}
+          onView={(id) => void viewStoredOutput(id)}
+        />
+      )}
+
       <section className="container-fluid my-3">
-        {!parsedOutput ? (
+        {isLoading ? (
+          <div className="bg-white border rounded-3 d-flex flex-column align-items-center text-secondary py-5 px-3 gap-3">
+            <Spinner label="Loading parsed output…" />
+            <span>Loading parsed output…</span>
+          </div>
+        ) : !parsedOutput ? (
           <div className="bg-white border rounded-3 text-center py-5 px-3">
             {loadError ? (
               <div className="text-danger">{loadError}</div>

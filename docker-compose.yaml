@@ -3,8 +3,18 @@ services:
     build:
       context: .
       dockerfile: alvie-cli/Dockerfile
-    
+
     hostname: alvie-cli
+
+    environment:
+      # Inside the compose network the CLI reaches the backend by its service
+      # name, not localhost (localhost is the app container itself). The viewer
+      # link, in contrast, is opened in the host browser via the published port.
+      - ALVIE_BACKEND_URL=http://backend:8000
+      - ALVIE_VIEWER_URL=http://localhost:4242
+
+    depends_on:
+      - backend
 
     volumes:
       - .:/home/alvie/alvie-cli
@@ -24,6 +34,21 @@ services:
     ports:
       - "127.0.0.1:4242:80"
 
-    # Make generated JSON files available to ?file=/parsed-output/<file>.json.
+  backend:
+    build:
+      context: .
+      dockerfile: alvie-web/backend/Dockerfile
+
+    hostname: alvie-backend
+
+    ports:
+      - "127.0.0.1:8000:8000"
     volumes:
-      - ./parsed-output:/usr/share/nginx/html/parsed-output:ro
+      - ./alvie-web/backend/app:/app/app
+      # Persist the SQLite database across container restarts/rebuilds.
+      - backend-data:/data
+
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
+
+volumes:
+  backend-data:

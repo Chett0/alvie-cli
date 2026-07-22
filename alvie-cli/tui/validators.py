@@ -5,7 +5,7 @@ from InquirerPy.base.control import Choice
 from prompt_toolkit.document import Document
 from prompt_toolkit.validation import Validator, ValidationError
 
-from instructions import Operand
+from models.instructions import Operand
 
 class FileExtensionValidator(Validator):
 

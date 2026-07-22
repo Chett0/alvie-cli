@@ -3,6 +3,7 @@ PROJECT_NAME = alvie
 
 SERVICE := app # CLI
 VIEWER_SERVICE := viewer # viewer
+BACKEND_SERVICE := backend # backend
 
 COMPOSE_CMD := docker compose -p $(PROJECT_NAME)
 
@@ -21,16 +22,17 @@ build:
 rebuild:
 	$(COMPOSE_CMD) build --no-cache
 
-# start viewer in background and run alvie-cli in foreground
-run:
-	$(COMPOSE_CMD) up --build -d $(VIEWER_SERVICE)
-	$(COMPOSE_CMD) run --rm -it $(SERVICE)
+# start viewer and backend in background and run alvie-cli in foreground
+run: viewer backend cli
 
 cli:
 	$(COMPOSE_CMD) run --build --rm -it $(SERVICE)
 
 viewer:
 	$(COMPOSE_CMD) up --build -d $(VIEWER_SERVICE)
+
+backend:
+	$(COMPOSE_CMD) up --build -d $(BACKEND_SERVICE)
 
 up:
 	$(COMPOSE_CMD) up --build -d
