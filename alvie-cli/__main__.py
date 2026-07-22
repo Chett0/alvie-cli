@@ -1,4 +1,5 @@
 import argparse
+from dataclasses import dataclass, field
 from datetime import datetime
 from email import errors
 from io import TextIOWrapper
@@ -21,6 +22,7 @@ from executions import (
 from flows import is_debug_enabled
 from output import (
     AlvieExecution,
+    AlvieExecutionBuilder,
     ParallelDashboard,
     DEBUG_PARSED_OUTPUT_ERROR,
     DEBUG_REQUIRES_RAW_OUTPUT_ERROR,
@@ -125,7 +127,54 @@ def _execution_label(execution: AlvieExecution, max_width: int = 48) -> str:
     return label
 
 
-def run_non_interactive(argv: list[str]) -> None:
+@dataclass
+class CliArguments(argparse.Namespace):
+    """Typed namespace holding every argument accepted by the non-interactive CLI."""
+
+    configs: list[Path] = field(default_factory=list)
+    raw_output: bool = False
+    parsed_output: list[Path] | None = None
+    output: Path | None = None
+    njobs: int = 1
+    interactive: bool = False
+    name: list[str] | None = None
+
+    @classmethod
+    def parse(
+        cls, 
+        parser: argparse.ArgumentParser, 
+        argv: list[str]
+    ) -> "CliArguments":
+        """Parse ``argv`` with ``parser`` into a typed ``CliArguments`` instance."""
+        return parser.parse_args(argv, namespace=cls())
+
+    def validate(
+            self, 
+            parser: argparse.ArgumentParser
+    ) -> None:
+        """Validate the parsed arguments"""
+        if self.njobs < 1:
+            parser.error("--njobs must be a positive integer")
+
+        # interactive mode cannot be used with raw output (requires a refactor to support both)
+        if self.interactive and self.raw_output:
+            parser.error("--interactive cannot be used with --raw-output")
+
+        # parallel execution requires at least one output file, terminal output is not supported
+        if self.njobs > 1 and not self.parsed_output and not self.output:
+            parser.error("--njobs > 1 requires --output or --parsed-output to be specified")
+
+        if not self.configs:
+            parser.error("No configuration files provided")
+        if self.parsed_output and len(self.parsed_output) != len(self.configs):
+            parser.error("The number of parsed-output paths must match the number of configuration files")
+
+        if self.name and not self.interactive:
+            parser.error("--name can only be used together with --interactive")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Build the argument parser for the non-interactive CLI."""
     parser = argparse.ArgumentParser(
         prog="alvie-cli",
         description="Interface for the Alvie analysis tool. "
@@ -135,6 +184,7 @@ def run_non_interactive(argv: list[str]) -> None:
     parser.add_argument(
         "configs",
         nargs="+",
+        type=json_output_path,
         help="Paths to saved command configurations (JSON) to execute."
              "Default sequential execution"
     )
@@ -187,22 +237,23 @@ def run_non_interactive(argv: list[str]) -> None:
         help="After running, upload each parsed output to the backend "
              "and print a link to open it in the Alvie viewer",
     )
+    parser.add_argument(
+        "-n", "--name",
+        nargs="+",
+        default=None,
+        help="Names under which the parsed output is stored on the backend, one "
+             "per configuration in the same order. Requires --interactive and, "
+             "unlike --parsed-output, does not write a local file",
+    )
+    return parser
 
-    namespace = parser.parse_args(argv)
 
-    if namespace.njobs < 1:
-        parser.error("--njobs must be a positive integer")
+def run_non_interactive(argv: list[str]) -> None:
+    parser = build_parser()
+    args = CliArguments.parse(parser, argv)
+    args.validate(parser)
 
-    # parallel execution requires at least one output file, terminal output is not supported
-    if namespace.njobs > 1 and not namespace.parsed_output and not namespace.output:
-            parser.error("--njobs > 1 requires --output or --parsed-output to be specified")
-
-    if not namespace.configs:
-        parser.error("No configuration files provided")
-    if namespace.parsed_output and len(namespace.parsed_output) != len(namespace.configs):
-        parser.error("The number of parsed-output paths must match the number of configuration files")
-
-    config_paths = [Path(config) for config in namespace.configs]
+    config_paths = [Path(config) for config in args.configs]
     for config_path in config_paths:
         if not config_path.is_file():
             parser.error(f"Configuration file not found: {config_path}")
@@ -220,34 +271,36 @@ def run_non_interactive(argv: list[str]) -> None:
             parser.error(f"{config_path}: {error}")
 
         if is_debug_enabled(config_command.args):
-            if not namespace.raw_output:
+            if not args.raw_output:
                 parser.error(f"{config_path}: {DEBUG_REQUIRES_RAW_OUTPUT_ERROR}")
-            if namespace.parsed_output:
+            if args.parsed_output:
                 parser.error(f"{config_path}: {DEBUG_PARSED_OUTPUT_ERROR}")
 
-        executions.append(AlvieExecution(
-            alvie_path=alvie_path,
-            executable=command.executable,
-            args=config_command.args,
-            is_raw_output=namespace.raw_output,
-            output_path=namespace.output,
-            parsed_output_path=namespace.parsed_output[i] if namespace.parsed_output else None,
-        ))
+        parsed_output_path : Path | None = args.parsed_output[i] if args.parsed_output else None
+        upload_name : str | None = args.name[i] if args.name else None
+        executions.append(
+            AlvieExecutionBuilder()
+                .with_alvie_path(alvie_path)
+                .with_executable(command.executable)
+                .with_args(config_command.args)
+                .raw_output(args.raw_output)
+                .with_output_path(args.output)
+                .with_parsed_output_path(parsed_output_path)
+                .with_upload_name(upload_name)
+                .interactive(args.interactive)
+                .build()
+        )
 
     # sequential execution
-    if namespace.njobs == 1 or len(executions) == 1:
+    if args.njobs == 1 or len(executions) == 1:
         for execution in executions:
             execution.run_seq()
     else:
         run_parallel(
-            output_path=namespace.output,
+            output_path=args.output,
             executions=executions,
-            njobs=namespace.njobs
+            njobs=args.njobs
         )
-
-    if namespace.interactive:
-        for execution in executions:
-            execution.upload_execution()
 
 
 def run_interactive() -> None:
