@@ -10,12 +10,22 @@ from InquirerPy.prompts.filepath import FilePathPrompt
 
 from prompt_toolkit.validation import ValidationError
 
-from commands import Command, Argument, ConfigCommand
-from utils import DONE_CHOICE, get_alvie_code_path, is_done, load_args, load_commands, validate_save_path
-from output import AlvieExecution, DEBUG_PARSED_OUTPUT_ERROR
-from entities import build_choices
-from validators import FileExtensionValidator
-from flows import Flow, StepOutput, StepResult, CommandState, ConfigArg, create_prompt, is_debug_enabled
+from .entities_flow import build_choices
+from models.commands import Command, Argument, ConfigCommand
+from config.paths import get_alvie_code_path, validate_save_path
+from config.loaders import load_args, load_commands
+from execution.runner import AlvieExecution, DEBUG_PARSED_OUTPUT_ERROR
+from tui.validators import FileExtensionValidator
+from tui.choices import DONE_CHOICE, is_done
+from tui.flow import (
+    Flow, 
+    StepOutput, 
+    StepResult, 
+    CommandState, 
+    ConfigArg, 
+    create_prompt, 
+    is_debug_enabled
+)
 
 
 ALVIE_PATH = get_alvie_code_path()

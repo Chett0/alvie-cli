@@ -1,5 +1,4 @@
 from enum import Enum
-from unittest import case
 from typing_extensions import Self
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
@@ -12,9 +11,19 @@ from InquirerPy.prompts.list import ListPrompt
 from InquirerPy.base.control import Choice
 from InquirerPy.prompts.confirm import ConfirmPrompt
 
-from instructions import BaseChoice
-from validators import FileExtensionValidator, DirectoryValidator, HashValidator, IntValidator, ValuesValidator, HexValidator
-from flows import create_prompt, ConfigArg
+from models.instructions import BaseChoice
+from tui.validators import (
+    FileExtensionValidator, 
+    DirectoryValidator, 
+    HashValidator, 
+    IntValidator, 
+    ValuesValidator, 
+    HexValidator
+)
+from tui.flow import (
+    create_prompt, 
+    ConfigArg
+)
 
 class InputType(Enum):
     FILENAME = "filename"
