@@ -1,17 +1,16 @@
-# ALVIE-CLI
+# ALVIE-UI
 
-Python wrapper for [ALVIE](https://github.com/unive-alvie/alvie)
+User interface for [ALVIE](https://github.com/unive-alvie/alvie)
 
-<br>
 <br>
 
 ### What is ALVIE?
 
 ALVIE is a research tool for the automated security analysis and vulnerability discovery in the Sancus embedded processor, created by the University of Venice.
 
-### Why ALVIE-CLI?
+### Why ALVIE-UI?
 
-It provides a user-friendly command-line interface (CLI) that simplifies the interaction with ALVIE, by offering interactive guided workflows, configuration management and output parsing.
+It provides a user-friendly interface (CLI and web) that simplifies the interaction with ALVIE, by offering interactive guided workflows, configuration management and output parsing.
 
 <br>
 
@@ -48,7 +47,7 @@ Use a previously saved configuration to run the same command without any user in
 
 ### Requirements
 
-*ALVIE-CLI* is fully containerized and supports both **x86_64 (amd64)** and **aarch64 (arm64)** architectures.
+*ALVIE-UI* is fully containerized and supports both **x86_64 (amd64)** and **aarch64 (arm64)** architectures.
 
 Ensure you have the following installed on your system:
 
@@ -62,29 +61,28 @@ git clone https://github.com/Chett0/alvie-cli
 
 ```bash
 make run # start viewer in background and CLI in foreground
-
-make cli # start CLI only
-
-make viewer # start viewer only
 ```
+This will build ALVIE-CLI, ALVIE-VIEWER and ALVIE-BACKEND images. The viewer is available at `localhost:4242`
+
+Other useful commands are:
 
 ```bash
-make stop # stop viewer and CLI
+# build
+make cli 
+make viewer 
+make backend 
 
-make stop-cli # stop CLI only
+# stop
+make stop 
+make stop-cli 
+make stop-viewer
+make stop-backend
 
-make stop-viewer # stop viewer only
-```
-
-```bash
-make restart # restart viewer and CLI
-
-make restart-cli # restart CLI only
-
+#restart
+make restart 
+make restart-cli 
 make restart-viewer # restart viewer only
 ```
-
-This will build both the ALVIE-CLI and ALVIE-VIEWER images, available at `localhost:4242`
 
 <br>
 
@@ -196,7 +194,7 @@ interactive mode and executes the corresponding commands directly. This is usefu
 for scripting or for re-running previously saved configurations.
 
 ```bash
-python alvie-cli <config-file> [<config-file> ...] [-r | --raw-output] [-o | --output <output-file>] [-p | --parsed-output <json-file> ...] [--njobs <n>]
+python alvie-cli <config-file> [<config-file> ...] [-r | --raw-output] [-o | --output <output-file>] [-p | --parsed-output <json-file> ...] [--njobs <n>] [-i | --interactive] [-n | --name <name> ...]
 ```
 
 - `<config-file>`: one or more paths to saved command configurations (JSON). When
@@ -210,6 +208,9 @@ python alvie-cli <config-file> [<config-file> ...] [-r | --raw-output] [-o | --o
   listed. The JSON document contains the executable, its arguments, the start/end
   timestamps, a recap of the output symbols and the parsed hypotheses.
 - `--njobs <n>`: number of configurations to run in parallel (default: `1`, i.e. sequential execution).
+- `-i`, `--interactive`: after running, upload each parsed output to the backend
+- `-n`, `--name`: one or more names under which the parsed output is stored on the
+backend, one per configuration in the same order they are listed. Requires `--interactive`
 
 The configuration file uses the same format produced by the interactive mode when
 saving a command.
