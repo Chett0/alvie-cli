@@ -32,7 +32,7 @@ services:
     hostname: alvie-web
 
     ports:
-      - "127.0.0.1:4242:80"
+      - "0.0.0.0:4242:80"
 
   backend:
     build:
@@ -42,7 +42,7 @@ services:
     hostname: alvie-backend
 
     ports:
-      - "127.0.0.1:8000:8000"
+      - "0.0.0.0:8000:8000"
     volumes:
       - ./alvie-web/backend/app:/app/app
       # Persist the SQLite database across container restarts/rebuilds.

@@ -13,3 +13,16 @@
   background: var(--bs-primary-bg-subtle);
   border-color: var(--bs-primary);
 }
+
+.saved-output-item {
+  transition: background-color 0.15s ease;
+}
+
+.saved-output-item:hover,
+.saved-output-item:focus-within {
+  background-color: var(--bs-gray-100);
+}
+
+.saved-output-item:active {
+  background-color: var(--bs-gray-200);
+}

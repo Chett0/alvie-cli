@@ -2,7 +2,7 @@ import type { ParsedOutput } from './types'
 import { validateParsedOutput } from './validation'
 
 const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+  import.meta.env.VITE_API_BASE_URL ?? "http://" + window.location.hostname + ":8000"
 ).replace(/\/+$/, '')
 
 export interface StoredOutputSummary {
@@ -19,6 +19,11 @@ interface StoredOutputResponse {
   filename: string
   created_at: string
   data: unknown
+}
+
+export interface StoredOutputDownload {
+  filename: string
+  data: ParsedOutput
 }
 
 export const listStoredOutputs = async (
@@ -48,6 +53,46 @@ export const fetchStoredOutput = async (
 
   const record = (await response.json()) as StoredOutputResponse
   return validateParsedOutput(record.data)
+}
+
+export const createStoredOutput = async (
+  filename: string,
+  data: ParsedOutput,
+  signal?: AbortSignal,
+): Promise<{ id: number }> => {
+  const response = await fetch(`${API_BASE_URL}/api/outputs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename, data }),
+    signal,
+  })
+
+  if (!response.ok) {
+    throw new Error(`Unable to save stored output (${response.status}).`)
+  }
+
+  const record = (await response.json()) as StoredOutputResponse
+  return { id: record.id }
+}
+
+export const downloadStoredOutput = async (
+  id: number | string,
+  signal?: AbortSignal,
+): Promise<StoredOutputDownload> => {
+  const response = await fetch(`${API_BASE_URL}/api/outputs/${id}`, { signal })
+
+  if (response.status === 404) {
+    throw new Error(`Stored output ${id} was not found.`)
+  }
+  if (!response.ok) {
+    throw new Error(`Unable to download stored output ${id} (${response.status}).`)
+  }
+
+  const record = (await response.json()) as StoredOutputResponse
+  return {
+    filename: record.filename,
+    data: validateParsedOutput(record.data),
+  }
 }
 
 export const renameStoredOutput = async (

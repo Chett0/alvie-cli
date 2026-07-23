@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   deleteAllStoredOutputs,
   deleteStoredOutput,
+  downloadStoredOutput,
   listStoredOutputs,
   renameStoredOutput,
 } from './api'
@@ -11,9 +12,15 @@ import Spinner from './Spinner'
 const OUTPUTS_PER_PAGE = 6
 
 interface SavedOutputsModalProps {
+  currentOutputId: number | null
   onClose: () => void
   onView: (id: number) => void
 }
+
+type PendingDelete =
+  | { type: 'one'; output: StoredOutputSummary }
+  | { type: 'all' }
+  | null
 
 const formatDate = (value: string): string => {
   const date = new Date(value)
@@ -33,15 +40,22 @@ const splitFilename = (filename: string): { stem: string; extension: string } =>
   }
 }
 
-function SavedOutputsModal({ onClose, onView }: SavedOutputsModalProps) {
+function SavedOutputsModal({
+  currentOutputId,
+  onClose,
+  onView,
+}: SavedOutputsModalProps) {
   const [outputs, setOutputs] = useState<StoredOutputSummary[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const [busyId, setBusyId] = useState<number | 'all' | null>(null)
+  const [busyId, setBusyId] = useState<number | 'all' | `download-${number}` | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editingStem, setEditingStem] = useState('')
   const [page, setPage] = useState(1)
   const dialogRef = useRef<HTMLDivElement | null>(null)
+
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null)
+  const isBusy = busyId !== null
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true)
@@ -57,7 +71,7 @@ function SavedOutputsModal({ onClose, onView }: SavedOutputsModalProps) {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : 'Unable to load saved configurations.',
+          : 'Unable to load saved executions.',
       )
     } finally {
       setIsLoading(false)
@@ -74,7 +88,14 @@ function SavedOutputsModal({ onClose, onView }: SavedOutputsModalProps) {
     const previouslyFocusedElement = document.activeElement
 
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key !== 'Escape') return
+
+      if (pendingDelete) {
+        if (!isBusy) setPendingDelete(null)
+        return
+      }
+
+      onClose()
     }
 
     document.body.classList.add('modal-open')
@@ -89,7 +110,7 @@ function SavedOutputsModal({ onClose, onView }: SavedOutputsModalProps) {
         previouslyFocusedElement.focus()
       }
     }
-  }, [onClose])
+  }, [isBusy, onClose, pendingDelete])
 
   const totalPages = Math.max(1, Math.ceil(outputs.length / OUTPUTS_PER_PAGE))
   const safePage = Math.min(page, totalPages)
@@ -99,18 +120,54 @@ function SavedOutputsModal({ onClose, onView }: SavedOutputsModalProps) {
     [outputs, startIndex],
   )
 
-  const removeOne = async (id: number) => {
+  const removeOne = async (id: number): Promise<boolean> => {
     setBusyId(id)
     setError('')
 
     try {
       await deleteStoredOutput(id)
       await refresh()
+      return true
     } catch (deleteError) {
       setError(
         deleteError instanceof Error
           ? deleteError.message
           : 'Unable to delete this configuration.',
+      )
+      return false
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const requestRemoveOne = (output: StoredOutputSummary) => {
+    setPendingDelete({ type: 'one', output })
+    setError('')
+  }
+
+  const downloadOne = async (output: StoredOutputSummary) => {
+    const busyKey = `download-${output.id}` as const
+    setBusyId(busyKey)
+    setError('')
+
+    try {
+      const { filename, data } = await downloadStoredOutput(output.id)
+      const blob = new Blob([`${JSON.stringify(data, null, 2)}\n`], {
+        type: 'application/json',
+      })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.append(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch (downloadError) {
+      setError(
+        downloadError instanceof Error
+          ? downloadError.message
+          : 'Unable to download this configuration.',
       )
     } finally {
       setBusyId(null)
@@ -161,11 +218,7 @@ function SavedOutputsModal({ onClose, onView }: SavedOutputsModalProps) {
     }
   }
 
-  const removeAll = async () => {
-    if (!window.confirm('Delete all saved configurations? This cannot be undone.')) {
-      return
-    }
-
+  const removeAll = async (): Promise<boolean> => {
     setBusyId('all')
     setError('')
 
@@ -173,18 +226,49 @@ function SavedOutputsModal({ onClose, onView }: SavedOutputsModalProps) {
       await deleteAllStoredOutputs()
       setPage(1)
       await refresh()
+      return true
     } catch (deleteError) {
       setError(
         deleteError instanceof Error
           ? deleteError.message
           : 'Unable to delete the configurations.',
       )
+      return false
     } finally {
       setBusyId(null)
     }
   }
 
-  const isBusy = busyId !== null
+  const confirmDelete = async () => {
+    if (!pendingDelete) return
+
+    const shouldRedirect =
+      pendingDelete.type === 'all' ||
+      pendingDelete.output.id === currentOutputId
+    const deleted =
+      pendingDelete.type === 'one'
+        ? await removeOne(pendingDelete.output.id)
+        : await removeAll()
+
+    if (!deleted) return
+
+    setPendingDelete(null)
+    if (shouldRedirect) window.location.assign('/')
+  }
+
+  const cancelDelete = () => {
+    if (isBusy) return
+    setPendingDelete(null)
+  }
+
+  const deleteTitle =
+    pendingDelete?.type === 'all'
+      ? 'Delete all saved executions?'
+      : 'Delete saved execution?'
+  const deleteMessage =
+    pendingDelete?.type === 'all'
+      ? 'This will permanently remove every saved execution from the database.'
+      : `This will permanently remove "${pendingDelete?.output.filename ?? ''}" from the database.`
 
   return (
     <>
@@ -203,7 +287,7 @@ function SavedOutputsModal({ onClose, onView }: SavedOutputsModalProps) {
           <div className="modal-content">
             <div className="modal-header">
               <h5 className="modal-title" id="saved-outputs-title">
-                Saved configurations
+                Saved executions
               </h5>
               <button
                 type="button"
@@ -217,12 +301,12 @@ function SavedOutputsModal({ onClose, onView }: SavedOutputsModalProps) {
             <div className="modal-body">
               {isLoading ? (
                 <div className="d-flex flex-column align-items-center text-secondary text-center py-4 gap-2">
-                  <Spinner label="Loading saved configurations…" />
-                  <span>Loading saved configurations…</span>
+                  <Spinner label="Loading saved executions…" />
+                  <span>Loading saved executions…</span>
                 </div>
               ) : outputs.length === 0 ? (
                 <div className="text-secondary text-center py-4">
-                  No saved configurations yet.
+                  No saved executions yet.
                 </div>
               ) : (
                 <div className="list-group">
@@ -233,7 +317,7 @@ function SavedOutputsModal({ onClose, onView }: SavedOutputsModalProps) {
                     return (
                       <div
                         key={output.id}
-                        className="list-group-item d-flex justify-content-between align-items-center gap-3"
+                        className="saved-output-item list-group-item d-flex justify-content-between align-items-center gap-3"
                       >
                         {isEditing ? (
                           <form
@@ -327,6 +411,31 @@ function SavedOutputsModal({ onClose, onView }: SavedOutputsModalProps) {
                               <button
                                 type="button"
                                 className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center"
+                                onClick={() => void downloadOne(output)}
+                                disabled={isBusy}
+                                aria-label={`Download ${output.filename}`}
+                                title="Download"
+                              >
+                                {busyId === `download-${output.id}` ? (
+                                  <Spinner size="sm" variant="secondary" label="Downloading…" />
+                                ) : (
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="16"
+                                    height="16"
+                                    fill="currentColor"
+                                    viewBox="0 0 16 16"
+                                    aria-hidden="true"
+                                  >
+                                    <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5A1.5 1.5 0 0 0 2.5 14h11a1.5 1.5 0 0 0 1.5-1.5v-2.5a.5.5 0 0 1 1 0v2.5A2.5 2.5 0 0 1 13.5 15h-11A2.5 2.5 0 0 1 0 12.5v-2.5a.5.5 0 0 1 .5-.5Z" />
+                                    <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3Z" />
+                                  </svg>
+                                )}
+                              </button>
+
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-outline-secondary d-inline-flex align-items-center"
                                 onClick={() => startEditing(output)}
                                 disabled={isBusy}
                                 aria-label={`Rename ${output.filename}`}
@@ -347,7 +456,7 @@ function SavedOutputsModal({ onClose, onView }: SavedOutputsModalProps) {
                               <button
                                 type="button"
                                 className="btn btn-sm btn-outline-danger d-inline-flex align-items-center"
-                                onClick={() => void removeOne(output.id)}
+                                onClick={() => requestRemoveOne(output)}
                                 disabled={isBusy}
                                 aria-label={`Delete ${output.filename}`}
                                 title="Delete"
@@ -386,7 +495,7 @@ function SavedOutputsModal({ onClose, onView }: SavedOutputsModalProps) {
               {totalPages > 1 && (
                 <nav
                   className="row g-0 align-items-center mt-3"
-                  aria-label="Saved configurations pagination"
+                  aria-label="Saved executions pagination"
                 >
                   <div className="col-4">
                     <button
@@ -421,7 +530,7 @@ function SavedOutputsModal({ onClose, onView }: SavedOutputsModalProps) {
               <button
                 type="button"
                 className="btn btn-outline-danger d-inline-flex align-items-center gap-2"
-                onClick={() => void removeAll()}
+                onClick={() => setPendingDelete({ type: 'all' })}
                 disabled={isBusy || outputs.length === 0}
               >
                 {busyId === 'all' && (
@@ -442,7 +551,66 @@ function SavedOutputsModal({ onClose, onView }: SavedOutputsModalProps) {
           </div>
         </div>
       </div>
+      {pendingDelete && (
+        <div
+          className="modal d-block"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-confirm-title"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) cancelDelete()
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow rounded-4">
+              <div className="modal-body text-center px-4 py-4">
+                <div className="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger-subtle text-danger mb-3 p-3">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="28"
+                    height="28"
+                    fill="currentColor"
+                    viewBox="0 0 16 16"
+                    aria-hidden="true"
+                  >
+                    <path d="M7.938 2.016A.13.13 0 0 1 8.002 2a.13.13 0 0 1 .063.016.15.15 0 0 1 .054.057l6.857 11.667c.036.061.035.114.016.15a.16.16 0 0 1-.13.085H1.142a.16.16 0 0 1-.13-.085c-.02-.036-.02-.089.016-.15L7.884 2.073a.15.15 0 0 1 .054-.057Zm1.044-.45a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566Z" />
+                    <path d="M7.002 12a1 1 0 1 1 2 0 1 1 0 0 1-2 0ZM7.1 5.995a.905.905 0 1 1 1.8 0l-.35 3.507a.553.553 0 0 1-1.1 0L7.1 5.995Z" />
+                  </svg>
+                </div>
+
+                <h5 className="modal-title fw-bold mb-3" id="delete-confirm-title">
+                  {deleteTitle}
+                </h5>
+                <p className="mb-4 text-secondary">{deleteMessage}</p>
+                <p className="visually-hidden">
+                  This action cannot be undone.
+                </p>
+
+                <button
+                  type="button"
+                  className="btn btn-danger btn-lg w-100 d-inline-flex align-items-center justify-content-center gap-2 mb-3"
+                  onClick={() => void confirmDelete()}
+                  disabled={isBusy}
+                >
+                  {isBusy && <Spinner size="sm" variant="light" label="Deleting..." />}
+                  {isBusy ? 'Deleting...' : 'Delete'}
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary btn-lg w-100"
+                  onClick={cancelDelete}
+                  disabled={isBusy}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="modal-backdrop fade show" />
+      {pendingDelete && <div className="modal-backdrop fade show" />}
     </>
   )
 }

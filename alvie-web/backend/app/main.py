@@ -17,8 +17,9 @@ app = FastAPI(title="Alvie Parsed Output API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4242"],
-    allow_methods=["*"],
+    allow_origins=["*"], # allow access from remote clients. In production, use a DNS name or stable IP address
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["*"],
 )
 

@@ -1,6 +1,6 @@
 import { ActorBadge, SymbolBadge } from './Badges'
 import symbolCatalog from './symbolCatalog'
-import type { RunStep } from './types'
+import type { Actor, RunStep } from './types'
 
 interface ActionDetailsProps {
   symbol: string
@@ -9,14 +9,24 @@ interface ActionDetailsProps {
     description: string
     color: string
   }
+  color?: string
 }
 
-function ActionDetails({ symbol, details }: ActionDetailsProps) {
+const inputColorForActor = (
+  actor: Actor,
+  catalogColor?: string,
+): string | undefined => {
+  if (actor === 'Enclave') return 'green'
+  if (actor === 'Attacker') return catalogColor?.includes('red') ? 'red' : 'blue'
+  return catalogColor
+}
+
+function ActionDetails({ symbol, details, color }: ActionDetailsProps) {
   return (
     <div className="step-action">
       <div className="d-flex align-items-center flex-wrap gap-2">
         <span className="fw-semibold">{details?.name ?? 'Unknown action'}</span>
-        <SymbolBadge symbol={symbol} color={details?.color} />
+        <SymbolBadge symbol={symbol} color={color ?? details?.color} />
       </div>
 
       <div className="small text-secondary mt-1">
@@ -95,6 +105,10 @@ function StepsTable({ steps }: { steps: RunStep[] }) {
                               <ActionDetails
                                 symbol={input.symbol}
                                 details={symbolCatalog.inputs[input.symbol]}
+                                color={inputColorForActor(
+                                  input.actor,
+                                  symbolCatalog.inputs[input.symbol]?.color,
+                                )}
                               />
                             </div>
                           ))}

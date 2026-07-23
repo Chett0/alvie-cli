@@ -3,21 +3,30 @@ import type { ChangeEvent, DragEvent } from 'react'
 
 interface ImportJsonModalProps {
   onClose: () => void
-  onImport: (file: File) => Promise<void>
+  onImport: (file: File, saveToDatabase: boolean) => Promise<void>
 }
 
 function ImportJsonModal({ onClose, onImport }: ImportJsonModalProps) {
   const [error, setError] = useState('')
   const [isDragging, setIsDragging] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const dragDepthRef = useRef(0)
 
   useEffect(() => {
     const previouslyFocusedElement = document.activeElement
 
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key !== 'Escape') return
+
+      if (pendingFile) {
+        if (!isImporting) setPendingFile(null)
+        return
+      }
+
+      onClose()
     }
 
     document.body.classList.add('modal-open')
@@ -32,9 +41,9 @@ function ImportJsonModal({ onClose, onImport }: ImportJsonModalProps) {
         previouslyFocusedElement.focus()
       }
     }
-  }, [onClose])
+  }, [isImporting, onClose, pendingFile])
 
-  const importFile = async (file?: File) => {
+  const requestImport = (file?: File) => {
     if (!file) return
 
     if (!file.name.toLowerCase().endsWith('.json')) {
@@ -43,10 +52,16 @@ function ImportJsonModal({ onClose, onImport }: ImportJsonModalProps) {
     }
 
     setError('')
+    setPendingFile(file)
+  }
+
+  const importFile = async (saveToDatabase: boolean) => {
+    if (!pendingFile) return
+
     setIsImporting(true)
 
     try {
-      await onImport(file)
+      await onImport(pendingFile, saveToDatabase)
       onClose()
     } catch (importError) {
       setError(
@@ -55,20 +70,22 @@ function ImportJsonModal({ onClose, onImport }: ImportJsonModalProps) {
           : 'Unable to import this JSON file.',
       )
       setIsImporting(false)
+      setPendingFile(null)
     }
   }
 
   const selectFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
-    void importFile(file)
+    requestImport(file)
   }
 
   // Route both browsing and drag-and-drop through the same import path.
   const dropFile = (event: DragEvent<HTMLButtonElement>) => {
     event.preventDefault()
+    dragDepthRef.current = 0
     setIsDragging(false)
-    void importFile(event.dataTransfer.files?.[0]) // take first dropped file
+    requestImport(event.dataTransfer.files?.[0]) // take first dropped file
   }
 
   return (
@@ -108,10 +125,15 @@ function ImportJsonModal({ onClose, onImport }: ImportJsonModalProps) {
                 onClick={() => fileInputRef.current?.click()}
                 onDragEnter={(event) => {
                   event.preventDefault()
+                  dragDepthRef.current += 1
                   setIsDragging(true)
                 }}
                 onDragOver={(event) => event.preventDefault()}
-                onDragLeave={() => setIsDragging(false)}
+                onDragLeave={(event) => {
+                  event.preventDefault()
+                  dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
+                  if (dragDepthRef.current === 0) setIsDragging(false)
+                }}
                 onDrop={dropFile}
                 disabled={isImporting}
               >
@@ -140,7 +162,53 @@ function ImportJsonModal({ onClose, onImport }: ImportJsonModalProps) {
           </div>
         </div>
       </div>
+      {pendingFile && (
+        <div
+          className="modal d-block"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="save-import-title"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !isImporting) {
+              setPendingFile(null)
+            }
+          }}
+        >
+          <div className="modal-dialog modal-dialog-centered modal-sm">
+            <div className="modal-content border-0 shadow rounded-4">
+              <div className="modal-body text-center px-4 py-4">
+                <h6 className="modal-title fw-bold mb-2" id="save-import-title">
+                  Save this configuration?
+                </h6>
+                <p className="mb-4 small text-secondary">
+                  Store {pendingFile.name} in the database for later access.
+                </p>
+
+                <button
+                  type="button"
+                  className="btn btn-primary w-100 d-inline-flex align-items-center justify-content-center gap-2 mb-2"
+                  onClick={() => void importFile(true)}
+                  disabled={isImporting}
+                >
+                  {isImporting && <span className="spinner-border spinner-border-sm" />}
+                  {isImporting ? 'Saving...' : 'Save'}
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary w-100"
+                  onClick={() => void importFile(false)}
+                  disabled={isImporting}
+                >
+                  Do not save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="modal-backdrop fade show" />
+      {pendingFile && <div className="modal-backdrop fade show" />}
     </>
   )
 }

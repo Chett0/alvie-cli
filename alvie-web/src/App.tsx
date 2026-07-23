@@ -7,15 +7,15 @@ import FilterBar from './FilterBar'
 import Header from './Header'
 import Hypotheses from './Hypotheses'
 import ImportJsonModal from './ImportJsonModal'
+import SavedOutputsHome from './SavedOutputsHome'
 import SavedOutputsModal from './SavedOutputsModal'
 import Spinner from './Spinner'
-import { fetchStoredOutput } from './api'
+import { createStoredOutput, fetchStoredOutput } from './api'
 import symbolCatalog from './symbolCatalog'
 import {
   getParsedOutputUrl,
   loadParsedOutput,
   parseParsedOutput,
-  setParsedOutputUrl,
   setStoredOutputUrl,
 } from './parsedOutputLoader'
 import type { FilterOptions, FilterValues, ParsedOutput } from './types'
@@ -37,6 +37,12 @@ const FILTER_OPTIONS: FilterOptions = {
   outputs: symbolsToOptions(symbolCatalog.outputs),
 }
 
+const getCurrentStoredOutputId = (): number | null => {
+  const fileUrl = getParsedOutputUrl()
+  if (!fileUrl || !/^\d+$/.test(fileUrl)) return null
+  return Number(fileUrl)
+}
+
 function App() {
   const [parsedOutput, setParsedOutput] = useState<ParsedOutput | null>(null)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
@@ -54,6 +60,16 @@ function App() {
     setFilters(EMPTY_FILTERS)
     setPage(1)
     setLoadError('')
+  }
+
+  const goHome = () => {
+    setParsedOutput(null)
+    setSearch('')
+    setFilters(EMPTY_FILTERS)
+    setPage(1)
+    setLoadError('')
+    setIsSavedModalOpen(false)
+    window.history.replaceState(null, '', '/')
   }
 
   useEffect(() => {
@@ -108,11 +124,16 @@ function App() {
     setPage(1)
   }
 
-  // A manually selected file is expected to live in the shared parsed-output directory.
-  const importJson = async (file: File) => {
+  const importJson = async (file: File, saveToDatabase: boolean) => {
     const data = parseParsedOutput(await file.text())
     showParsedOutput(data)
-    setParsedOutputUrl(file.name)
+
+    if (saveToDatabase) {
+      const stored = await createStoredOutput(file.name, data)
+      setStoredOutputUrl(stored.id)
+    } else {
+      window.history.replaceState(null, '', '/')
+    }
   }
 
   // Load a stored configuration from the backend and show it in the viewer.
@@ -154,6 +175,8 @@ function App() {
   return (
     <>
       <Header
+        isHome={!parsedOutput && !loadError && !isLoading}
+        onHomeClick={goHome}
         onImportClick={() => setIsImportModalOpen(true)}
         onSavedClick={() => setIsSavedModalOpen(true)}
       />
@@ -167,6 +190,7 @@ function App() {
 
       {isSavedModalOpen && (
         <SavedOutputsModal
+          currentOutputId={getCurrentStoredOutputId()}
           onClose={() => setIsSavedModalOpen(false)}
           onView={(id) => void viewStoredOutput(id)}
         />
@@ -179,15 +203,13 @@ function App() {
             <span>Loading parsed output…</span>
           </div>
         ) : !parsedOutput ? (
-          <div className="bg-white border rounded-3 text-center py-5 px-3">
-            {loadError ? (
+          loadError ? (
+            <div className="bg-white border rounded-3 text-center py-5 px-3">
               <div className="text-danger">{loadError}</div>
-            ) : (
-              <div className="text-secondary">
-                Import a parsed output JSON file to analyze its hypotheses.
-              </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <SavedOutputsHome onView={(id) => void viewStoredOutput(id)} />
+          )
         ) : (
           <>
             <CommandRun
