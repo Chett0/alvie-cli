@@ -58,5 +58,8 @@ restart-cli:
 restart-viewer:
 	$(COMPOSE_CMD) restart $(VIEWER_SERVICE)
 
+restart-backend:
+	$(COMPOSE_CMD) restart $(BACKEND_SERVICE)
+
 exec:
 	$(COMPOSE_CMD) exec -it $(SERVICE) /bin/bash --rcfile $(VENV_ACTIVATE)

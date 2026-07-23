@@ -9,7 +9,7 @@ from .database import Base, SessionDep, engine
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=engine) # create DB tables if they don't exist
     yield
 
 
@@ -17,7 +17,7 @@ app = FastAPI(title="Alvie Parsed Output API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:4242"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
